@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   errorMessage,
   listChunks,
@@ -30,6 +31,11 @@ function SourcesView() {
   // old state value, so a fast double click could upload the file twice.
   const uploadInFlight = useRef(false)
 
+  // Deep link from the Search view: /sources?source=<id>&chunk=<id>
+  const [params] = useSearchParams()
+  const targetSource = Number(params.get('source')) || null
+  const targetChunk = Number(params.get('chunk')) || null
+
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [chunksBySource, setChunksBySource] = useState<Record<number, Chunk[]>>({})
   const [chunkErrors, setChunkErrors] = useState<Record<number, string>>({})
@@ -50,6 +56,35 @@ function SourcesView() {
   useEffect(() => {
     void loadSources()
   }, [])
+
+  // Open the source a search result points at, once the list has arrived.
+  useEffect(() => {
+    if (!targetSource || !sources) return
+    if (expandedId === targetSource) return
+    const source = sources.find((item) => item.id === targetSource)
+    if (source) void toggleSource(source)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetSource, sources])
+
+  // Then bring the exact chunk into view. The delay lets the opened source's
+  // chunks finish laying out; scrolling in the same tick lands short.
+  useEffect(() => {
+    if (!targetChunk || !targetSource) return
+    if (!chunksBySource[targetSource]) return
+
+    const timer = window.setTimeout(() => {
+      const element = document.getElementById(`chunk-${targetChunk}`)
+      if (!element) return
+
+      // Instant, not smooth: a backgrounded tab never runs the smooth-scroll
+      // animation, and reduced-motion users should not get it either.
+      element.classList.add('chunk-target')
+      element.scrollIntoView({ block: 'start', behavior: 'auto' })
+    }, 120)
+
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetChunk, targetSource, chunksBySource])
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -239,7 +274,7 @@ function SourcesView() {
                         <p className="empty">This source has no chunks.</p>
                       ) : (
                         chunks?.map((chunk) => (
-                          <div className="chunk" key={chunk.id}>
+                          <div className="chunk" id={`chunk-${chunk.id}`} key={chunk.id}>
                             <span className="chunk-position">#{chunk.position}</span>
                             <p className="chunk-text">{chunk.text}</p>
                           </div>

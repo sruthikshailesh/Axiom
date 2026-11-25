@@ -126,7 +126,7 @@ def test_provider_failures_map_to_readable_messages() -> None:
     assert _public_message_for(400, "other problem") == DEFAULT_PUBLIC_MESSAGE
 
 
-def test_unhandled_exception_returns_readable_json(monkeypatch) -> None:
+def test_unhandled_exception_returns_readable_json(monkeypatch, auth_header) -> None:
     import app.routes.search as search_routes
 
     def boom(*args, **kwargs):
@@ -135,7 +135,9 @@ def test_unhandled_exception_returns_readable_json(monkeypatch) -> None:
     monkeypatch.setattr(search_routes, "search_chunks", boom)
 
     with TestClient(app, raise_server_exceptions=False) as test_client:
-        response = test_client.get("/search", params={"q": "ionosphere"})
+        response = test_client.get(
+            "/search", params={"q": "ionosphere"}, headers=auth_header
+        )
 
     assert response.status_code == 500
     assert response.json() == {"detail": UNHANDLED_ERROR_MESSAGE}

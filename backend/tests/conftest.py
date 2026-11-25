@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import secrets
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 from urllib.parse import urlsplit, urlunsplit
@@ -81,8 +83,72 @@ def db() -> Iterator[Session]:
         session.close()
 
 
+@dataclass(frozen=True)
+class TestAccount:
+    """Credentials generated for this test run; nothing is committed."""
+
+    username: str
+    password: str
+    token: str
+
+
+@pytest.fixture(scope="session", autouse=True)
+def auth_env() -> Iterator[TestAccount]:
+    """Configure the single local account with values made up per session."""
+    from app.auth import hash_password, issue_token
+    from app.config import settings
+
+    previous = (
+        settings.axiom_username,
+        settings.axiom_password_hash,
+        settings.axiom_secret,
+        settings.axiom_token_hours,
+    )
+
+    account = TestAccount(
+        username="user-{}".format(secrets.token_hex(4)),
+        password=secrets.token_urlsafe(18),
+        token="",
+    )
+
+    settings.axiom_username = account.username
+    settings.axiom_password_hash = hash_password(account.password)
+    settings.axiom_secret = secrets.token_hex(32)
+    settings.axiom_token_hours = 12
+
+    account = TestAccount(
+        username=account.username, password=account.password, token=issue_token(account.username)
+    )
+
+    try:
+        yield account
+    finally:
+        (
+            settings.axiom_username,
+            settings.axiom_password_hash,
+            settings.axiom_secret,
+            settings.axiom_token_hours,
+        ) = previous
+
+
 @pytest.fixture()
-def client() -> Iterator[TestClient]:
+def auth_header(auth_env: TestAccount) -> dict:
+    return {"Authorization": "Bearer {}".format(auth_env.token)}
+
+
+@pytest.fixture()
+def client(auth_env: TestAccount, auth_header: dict) -> Iterator[TestClient]:
+    """A signed-in client: every request carries a valid test token."""
+    from app.main import app
+
+    with TestClient(app) as test_client:
+        test_client.headers.update(auth_header)
+        yield test_client
+
+
+@pytest.fixture()
+def anon_client() -> Iterator[TestClient]:
+    """A client with no credentials, for the auth tests."""
     from app.main import app
 
     with TestClient(app) as test_client:

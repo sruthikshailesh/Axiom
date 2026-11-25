@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -11,10 +11,13 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.db import SessionLocal, engine
 from app.pipeline.run_state import sweep_interrupted_runs
+from app.routes import auth as auth_routes
+from app.routes import dashboard as dashboard_routes
 from app.routes import demo as demo_routes
 from app.routes import runs as run_routes
 from app.routes import search as search_routes
 from app.routes import sources as source_routes
+from app.routes.auth import require_user
 
 logger = logging.getLogger("axiom")
 
@@ -37,7 +40,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="AXIOM", version="0.6.0", lifespan=lifespan)
+app = FastAPI(title="AXIOM", version="0.8.0", lifespan=lifespan)
 
 # Explicit loopback origins only: never a wildcard.
 app.add_middleware(
@@ -45,13 +48,20 @@ app.add_middleware(
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
-app.include_router(source_routes.router)
-app.include_router(search_routes.router)
-app.include_router(run_routes.router)
-app.include_router(demo_routes.router)
+# Public: GET /health (below) and POST /auth/login. /auth/me checks its own token.
+app.include_router(auth_routes.router)
+
+# Everything else needs a signed-in user. The dependency is attached once per
+# router, so a new protected route cannot be added without it by accident.
+protected = [Depends(require_user)]
+app.include_router(source_routes.router, dependencies=protected)
+app.include_router(search_routes.router, dependencies=protected)
+app.include_router(run_routes.router, dependencies=protected)
+app.include_router(demo_routes.router, dependencies=protected)
+app.include_router(dashboard_routes.router, dependencies=protected)
 
 
 @app.exception_handler(Exception)

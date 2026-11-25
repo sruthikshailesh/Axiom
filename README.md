@@ -76,6 +76,12 @@ Only features that are implemented and working are listed here.
   old and new claims both recorded.
 - **A report view with evidence**: per-claim status, notes, quote, source title, and the
   conflicts and supersessions the claim takes part in.
+- **Sign-in** with a single local account: a PBKDF2 password hash and an HMAC-signed token
+  that every API route except `/health` and `/auth/login` requires.
+- **A dashboard**: counts of sources, runs and runs-with-a-conflict, the latest run's
+  status, the last five runs with links to their reports, and quick actions.
+- **Search**: full-text search with a debounced query box, highlighted snippets, and a click
+  straight through to the matched passage inside its source.
 - **A synthetic demo**: one click loads four fictional documents and runs a preset
   question end to end, with an on-screen banner marking the data as synthetic.
 - **A source library** showing every ingested document, its date, author and chunk count.
@@ -96,9 +102,11 @@ These are real, current limitations — not roadmap items presented as finished 
 - **Scanned PDFs are rejected.** Extraction uses `pypdf`, which reads a PDF's text layer.
   A scanned or image-only PDF has no text layer and is rejected with a 422 and an OCR hint.
   OCR is out of scope.
-- **There is no authentication or multi-user support.** AXIOM is a local, single-user tool:
-  the API has no accounts, no per-user data separation, and CORS is limited to the two
-  loopback frontend origins. It should not be exposed to the internet as-is.
+- **Sign-in is a single local account, not production authentication.** One username and
+  one password hash live in `backend/.env`; there are no user accounts, no registration, no
+  password reset, no roles, no per-user data separation and no rate limiting on login. Every
+  signed-in request sees the same data. CORS is limited to the two loopback frontend
+  origins. Do not expose this deployment to the internet as-is.
 - **Results depend on the LLM provider's output.** Claim wording, how many claims are
   extracted, and therefore which conflicts and supersessions are found, vary between
   models and between runs of the same model. The verifier's rules are deterministic, but
@@ -121,6 +129,8 @@ These are real, current limitations — not roadmap items presented as finished 
 | Orchestration | LangGraph (Researcher → Extractor → Verifier) |
 | Migrations | Alembic |
 | LLM | Any OpenAI-compatible chat completions API |
+| Auth | Standard-library PBKDF2 password hashing and HMAC-SHA256 signed tokens |
+| Typography | Space Grotesk (headings) and Inter (body), loaded from Google Fonts |
 | Infra | Docker Compose (database only) |
 
 ## Installation and setup
@@ -182,6 +192,11 @@ The other variables already have working defaults:
 | `LLM_MODEL` | Model name as your provider expects it. |
 | `LLM_BASE_URL` | Optional; point at any OpenAI-compatible endpoint. Leave empty for the default. |
 
+The app also needs the three sign-in variables before anyone can use it; create the
+password hash and set `AXIOM_USERNAME`, `AXIOM_PASSWORD_HASH` and `AXIOM_SECRET` as
+described in [Sign-in](#sign-in). Until then the login screen answers "Sign-in is not
+configured."
+
 ### 4. Create the tables
 
 Still in `backend/` with the virtualenv active:
@@ -210,10 +225,22 @@ npm install
 npm run dev
 ```
 
+The page loads two Google Fonts with a `<link>` in `frontend/index.html`: **Space Grotesk**
+for headings and **Inter** for body text, each with a system-font fallback. Without network
+access the app still renders, in the fallback fonts.
+
 ## How to run
 
 With the database container, the backend on port 8000 and the frontend on port 5173 all
-running, open **<http://localhost:5173>** in a browser. Stay on that one origin for the
+running, open **<http://localhost:5173>** in a browser and sign in with the account from
+the [Sign-in](#sign-in) section. Every page except the sign-in screen needs that session.
+
+- **Sign in.** Enter `AXIOM_USERNAME` and the password whose hash you put in `backend/.env`.
+  A wrong password says "Incorrect username or password." and keeps you on the page; a
+  session that expires or a token that has been tampered with sends you back here with
+  "Your session has ended. Sign in again."
+- **Dashboard.** Summary cards, the last five runs and quick actions. This is where sign-in
+  lands you. Stay on that one origin for the
 session (the backend also allows `127.0.0.1:5173`) so the remembered last-run link keeps
 working.
 
@@ -234,6 +261,56 @@ working.
 
 To stop, press `Ctrl+C` in both terminals and run `docker compose down` (add `-v` to drop
 the database volume as well).
+
+## Sign-in
+
+AXIOM has **one local account**, meant for one person on one machine. It is not production
+authentication: there is no registration, no user management and no per-user data
+separation.
+
+### Create the password hash
+
+From `backend/`, with the virtualenv active:
+
+```bash
+python scripts/make_password_hash.py
+```
+
+The password is typed twice with `getpass`, so it is never echoed and never lands in your
+shell history. The script prints a line like:
+
+```
+AXIOM_PASSWORD_HASH=pbkdf2_sha256$200000$<salt_hex>$<hash_hex>
+```
+
+That is PBKDF2-HMAC-SHA256 with 200 000 iterations and a random 16-byte salt. Paste the
+line into `backend/.env`.
+
+### Set the three variables
+
+Add these to `backend/.env` (see `backend/.env.example`):
+
+| Variable | Meaning |
+| --- | --- |
+| `AXIOM_USERNAME` | The only username that can sign in. |
+| `AXIOM_PASSWORD_HASH` | The line printed by `scripts/make_password_hash.py`. |
+| `AXIOM_SECRET` | Any long random string (for example `python3 -c "import secrets; print(secrets.token_hex(32))"`). It signs the session tokens; changing it signs everyone out. |
+| `AXIOM_TOKEN_HOURS` | Optional, default `12`: how long a session lasts. |
+
+Restart the backend after editing `.env` — settings are read at startup. If any of the
+three variables is missing, `POST /auth/login` answers `503` with "Sign-in is not
+configured. Set AXIOM_USERNAME, AXIOM_PASSWORD_HASH and AXIOM_SECRET in backend/.env."
+and the rest of the app stays signed-out and unreachable, which is intended.
+
+### How a session works
+
+`POST /auth/login` returns a token shaped `payload.signature`: base64url JSON holding the
+username and an expiry, signed with HMAC-SHA256 using `AXIOM_SECRET`. The browser stores
+that single string in `localStorage` under `axiom.token` and sends it as
+`Authorization: Bearer <token>`. Every API route except `GET /health` and
+`POST /auth/login` rejects a missing, malformed, forged or expired token with `401`. A
+`401` clears the stored token and returns you to the sign-in screen. Nothing logs a
+password, a hash or a token.
 
 ## Architecture
 
@@ -258,6 +335,9 @@ flowchart LR
 
 ### Workflow
 
+0. The user signs in. The browser holds one signed token and sends it as a bearer header;
+   FastAPI validates it before any router runs, and a `401` sends the browser back to the
+   sign-in screen.
 1. The user uploads a document. FastAPI extracts its text (`pypdf` for PDFs), splits it
    into overlapping chunks, and stores the chunks — PostgreSQL computes the `tsvector` for
    each one.

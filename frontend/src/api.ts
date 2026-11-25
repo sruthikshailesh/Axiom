@@ -1,5 +1,7 @@
 /** Typed access to the AXIOM backend. The browser never sees an LLM key. */
 
+import { clearToken, getToken, notifyUnauthorized } from './session'
+
 export const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(
   /\/+$/,
   '',
@@ -20,6 +22,14 @@ export interface Chunk {
   source_id: number
   position: number
   text: string
+}
+
+export interface SearchHit {
+  chunk_id: number
+  source_id: number
+  position: number
+  text: string
+  rank: number
 }
 
 export interface RunSummary {
@@ -73,6 +83,29 @@ export interface RunDetail {
   supersessions: Supersession[]
 }
 
+export interface LoginResponse {
+  token: string
+  username: string
+  expires_at: string
+}
+
+export interface RecentRun {
+  id: number
+  question: string
+  status: string
+  demo: boolean
+  created_at: string
+  finished_at: string | null
+}
+
+export interface DashboardSummary {
+  sources: number
+  runs: number
+  runs_with_conflict: number
+  latest_run_status: string | null
+  recent_runs: RecentRun[]
+}
+
 function detailMessage(detail: unknown): string | null {
   if (typeof detail === 'string' && detail.trim()) return detail
   if (Array.isArray(detail)) {
@@ -91,12 +124,27 @@ function detailMessage(detail: unknown): string | null {
   return null
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+interface RequestOptions extends RequestInit {
+  /** Sign-in must show its own 401, not trigger the "session ended" redirect. */
+  skipAuthRedirect?: boolean
+}
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { skipAuthRedirect, ...init } = options
+  const headers = new Headers(init.headers)
+  const token = getToken()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+
   let response: Response
   try {
-    response = await fetch(`${API_URL}${path}`, init)
+    response = await fetch(`${API_URL}${path}`, { ...init, headers })
   } catch {
     throw new Error(`Cannot reach the AXIOM backend at ${API_URL}. Is uvicorn running?`)
+  }
+
+  if (response.status === 401 && !skipAuthRedirect) {
+    clearToken()
+    notifyUnauthorized()
   }
 
   if (!response.ok) {
@@ -113,6 +161,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (response.status === 204) return undefined as T
   return (await response.json()) as T
+}
+
+export function login(username: string, password: string): Promise<LoginResponse> {
+  return request<LoginResponse>('/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+    skipAuthRedirect: true,
+  })
+}
+
+export function currentUser(): Promise<{ username: string }> {
+  return request<{ username: string }>('/auth/me')
+}
+
+export function dashboardSummary(): Promise<DashboardSummary> {
+  return request<DashboardSummary>('/dashboard/summary')
 }
 
 export function listSources(): Promise<SourceSummary[]> {
@@ -135,6 +200,11 @@ export function uploadSource(
 
 export function listChunks(sourceId: number): Promise<Chunk[]> {
   return request<Chunk[]>(`/sources/${sourceId}/chunks`)
+}
+
+export function searchChunks(query: string, limit = 20): Promise<SearchHit[]> {
+  const params = new URLSearchParams({ q: query, limit: String(limit) })
+  return request<SearchHit[]>(`/search?${params.toString()}`)
 }
 
 export function startRun(question: string): Promise<RunSummary> {

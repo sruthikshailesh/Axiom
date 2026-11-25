@@ -475,3 +475,122 @@ claims/runs/evidence/conflicts/supersession tables, no frontend changes.
     instead of staying uncertain) is still disclosed in the README's limitations section and
     in the Phase 5b notes above. The only code change is the removal of the nested
     `frontend/.git` (repository metadata, not application code).
+
+## Phase 8 — Sign-in, shell, dashboard, search, guide
+
+1. **Single account, standard library only (`app/auth.py`).** `hash_password()` is
+   PBKDF2-HMAC-SHA256 with 200000 iterations and a 16-byte random salt, stored as
+   `pbkdf2_sha256$<iterations>$<salt_hex>$<hash_hex>`; `hash_password()` refuses fewer than
+   200000 iterations. `verify_password()` parses the stored value defensively and compares
+   with `hmac.compare_digest`, so a malformed hash in `.env` denies sign-in instead of
+   raising. Tokens are `base64url(JSON).base64url(HMAC-SHA256)`, carrying `sub`, `exp` and
+   `iat`; `read_token()` checks the signature before it decodes the payload, rejects
+   malformed strings and bad padding, rejects `exp <= now`, and rejects a `sub` that is not
+   the configured username (one account, so a token for any other name is useless here).
+   No password, hash or token is logged anywhere; the only place a token appears in a
+   response is `POST /auth/login`.
+
+2. **Settings are optional so the app boots without them.** `AXIOM_USERNAME`,
+   `AXIOM_PASSWORD_HASH` and `AXIOM_SECRET` default to `None` and `AXIOM_TOKEN_HOURS` to
+   `12`. With any of the three missing, `POST /auth/login` answers 503 with the sentence the
+   phase specifies, rather than failing at import or half-working.
+
+3. **One rejection message, no username/password oracle.** `POST /auth/login` compares the
+   username with `hmac.compare_digest` and the password with `verify_password`, and always
+   answers `401 {"detail": "Incorrect username or password."}`. The test asserts the two
+   failure bodies are byte-identical.
+
+4. **Protection is attached per router, not per handler.** `require_user` reads the
+   `Authorization: Bearer` header and is passed as `dependencies=[Depends(require_user)]` on
+   the `sources`, `search`, `runs`, `demo` and `dashboard` routers in `main.py`, so a new
+   route in one of those files cannot forget it. `GET /health`, `POST /auth/login` and
+   `GET /auth/me` stay outside; CORS preflight is handled by the middleware before routing.
+   CORS headers are now the explicit list `["Authorization", "Content-Type"]` instead of
+   `*`. A missing, malformed, forged or expired token answers 401 with
+   `"Your session has ended. Sign in again."`, the same sentence the frontend shows.
+
+5. **`GET /dashboard/summary` returns run metadata, not document text.** It answers
+   `sources`, `runs`, `runs_with_conflict` (distinct runs with at least one conflict row),
+   `latest_run_status` and `recent_runs` (the last 5, newest first, each with `id`,
+   `question`, `status`, `demo`, `created_at`, `finished_at`). The phase asks for counts plus
+   a recent-runs list with each run's question; the run's question is user input, not
+   document text, so it is the only string in the response. A test asserts the exact key set
+   so a document field cannot creep in unnoticed.
+
+6. **`backend/scripts/make_password_hash.py`** reads the password twice with `getpass`
+   (never echoed, never in shell history), prints the `AXIOM_PASSWORD_HASH=…` line, and
+   prints the iteration count to stderr. Mismatched entries exit non-zero.
+
+7. **Tests get their own credentials (`tests/conftest.py`).** A session-scoped `auth_env`
+   fixture invents a random username, a random password and a random secret per run, hashes
+   the password with the real function, and issues a real token; nothing is hard-coded and
+   nothing is committed. The `client` fixture now carries `Authorization: Bearer <token>` in
+   its headers, so every existing test sends a valid token without changing its call sites,
+   and a new `anon_client` fixture sends none. `test_hardening.py`'s own `TestClient` call
+   now passes `auth_header`. Suite: 48 passed (34 before, 14 new).
+
+8. **Frontend token handling (`src/session.ts`, `src/api.ts`).** One `localStorage` key,
+   `axiom.token`, holding only the token string. Every API call attaches the bearer header;
+   a 401 clears the token and dispatches `axiom:unauthorized`, which `App` turns into a
+   redirect to `/sign-in` with the "Your session has ended" message. Sign-in opts out of
+   that path (`skipAuthRedirect`), so a wrong password shows the backend's message on the
+   page instead of bouncing the user around.
+
+9. **Sign-in page.** `GlyphField` draws faint dusty-purple characters on a canvas and
+   drifts them with `requestAnimationFrame`. It draws a single static frame when
+   `prefers-reduced-motion: reduce` matches, and also stops when the page is hidden
+   (`visibilitychange` cancels the frame and redraws on return); the media query is watched
+   with `addEventListener('change')` so toggling it takes effect without a reload. The whole
+   stylesheet also disables animation and transitions under the same media query.
+
+10. **Shell and guard.** `RequireAuth` wraps every route except `/sign-in`; without a token
+    it redirects with `Navigate replace`. The sidebar lists Dashboard, Ask, Sources, Search,
+    Guide and Sign out, shows the username from `GET /auth/me` at the bottom, and the active
+    item is purple (`aria-current` styling comes from `NavLink`'s `active` class). Below
+    900px the sidebar becomes a horizontal bar above the content. `Ask` keeps the old query
+    view; the Report nav link was removed because the dashboard's recent runs and the
+    post-run redirect both reach a report.
+
+11. **Deep link from search to the source.** Clicking a result navigates to
+    `/sources?source=<id>&chunk=<id>`; `SourcesView` opens that source once the list arrives
+    and scrolls the chunk into view. Two corrections were needed while testing: the scroll
+    ran before the opened source's chunks had laid out (fixed with a 120 ms delay), and
+    `behavior: 'smooth'` never starts in a backgrounded tab, so the scroll is instant
+    (`behavior: 'auto'`, `block: 'start'`). Instant is also what reduced-motion wants.
+
+12. **Search.** 300 ms debounce with a cancellation flag, `limit=20`. Snippets are ~300
+    characters starting 90 characters before the first matched term, with the term marked
+    inline; the title, doc date and author come from `GET /sources` (the search endpoint
+    returns chunk data only, and changing it would have touched pipeline-adjacent code). An
+    empty query shows a hint; a finished search with no hits shows "No passages match that
+    search."
+
+13. **Dashboard.** Four stat cards (sources, runs, runs with a conflict, latest run status),
+    the last five runs with a report link, three quick actions, and an onboarding card when
+    there are no sources or no runs. "Load the demo" calls the existing `POST /demo/run` and
+    navigates to the report.
+
+14. **Guide.** Seven sections, written against what the app does: what AXIOM does, the three
+    steps, accepted types (`.txt`, `.md`, text-based `.pdf`, 10 MB each, scanned PDFs
+    rejected because OCR is not built), why date and author matter, good questions, the four
+    statuses with one example each, and the limitations (LLM-dependent results, single local
+    account, synthetic demo data).
+
+15. **Dev credential lives only in `backend/.env`.** A local development account was
+    generated for the acceptance checks: username `sruthik`, a password told to the owner,
+    a random secret. The hash and secret are in the gitignored `.env`; `.env.example` carries
+    placeholders only. Rotate with `python scripts/make_password_hash.py` and a new
+    `AXIOM_SECRET` (which signs every existing token out).
+
+16. **Verification notes.** `preview` runs in a background tab, so `requestAnimationFrame`
+    is throttled and the sign-in canvas cannot be watched moving. The motion branch was
+    instead verified by counting the frames the component schedules: 2 with motion allowed,
+    0 with `prefers-reduced-motion` forced to match, using the real component and a patched
+    `matchMedia`. That is a code-path check, not a visual one.
+
+17. **Packages and cuts.** No package added: the redesign is plain CSS plus the two Google
+    Fonts loaded by `index.html` (Space Grotesk for headings, Inter for body, with system
+    fallbacks). No pipeline, verifier, `decide_status()`, extractor-prompt or seed-document
+    change; the Phase 5b limitation is still disclosed in the README. Cut: no avatar, no
+    settings page, no password change screen (the hash is edited through the script), and no
+    multi-user support by design.
