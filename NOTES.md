@@ -188,3 +188,56 @@ claims/runs/evidence/conflicts/supersession tables, no frontend changes.
    virtualization or pagination in the source library — the corpora are small.
    No frontend test suite was added: the phase specifies none, and the
    acceptance checks were run by hand in the browser.
+
+## Phase 5 — Seed data and demo path
+
+1. **Migration `0004_demo_flag`** adds `run.demo BOOLEAN NOT NULL DEFAULT false`
+   (`op.add_column` with `server_default=sa.false()`); downgrade drops the
+   column. `0001`–`0003` are untouched. `Run.demo` is mapped as
+   `Mapped[bool]` with the same server default, so every `Run(...)` created by
+   `POST /runs` gets `demo=false` without the route setting it.
+2. **`backend/demo/`** holds the four plain-text documents (one chunk each,
+   ~170–200 words). Their titles, dates and authors are declared in
+   `app/demo.py`, not parsed out of the files. `load_demo(db)` reuses
+   `app.ingest.extract.extract_text` and `app.ingest.chunk.chunk_text` — the
+   same functions `POST /sources` uses — so no second parsing path exists.
+3. **`load_demo` is idempotent on title.** If a source with the same title is
+   already there it is reused and its chunks are left as they are; only missing
+   documents are ingested. Repeated `POST /demo/run` calls therefore keep the
+   corpus at four demo sources.
+4. **`POST /demo/run` returns 202 `{id, status: "queued", demo: true}`** and
+   schedules the same `execute_run` background task as `POST /runs`, so the demo
+   uses the Phase 4 run execution model unchanged. The router is registered in
+   `main.py` (version 0.5.0). `GET /runs/{id}` now also returns `demo`.
+5. **Frontend changes are limited to the two the phase asks for.**
+   `QueryView` enables the button (its own `demoLoading`/`demoError` state, so it
+   stays disabled while the request is in flight and shows the backend's
+   message on failure) and `ReportView` renders the honesty banner above the run
+   panel when `run.demo` is true (`alert-demo`, accent border, `role="note"`).
+   `api.ts` gained `startDemoRun()` and the `demo` field on `RunDetail`; no other
+   Phase 4 behaviour changed.
+6. **Tests.** `backend/tests/test_demo.py` has two tests: `load_demo` called
+   twice yields four demo sources (not eight), and `POST /demo/run` answers 202
+   with `demo: true` and the run's question equals `DEMO_QUESTION`. Both reuse
+   `fake_llm` and `_wait_for_run` imported from `test_pipeline.py`; no real LLM
+   is called. Suite: 27 passed.
+7. **Demo outcome — a real-LLM run does not reproduce the intended three
+   outcomes, and this is reported rather than patched around.** Five demo runs
+   against the configured model produced the same shape every time:
+   two claims, one conflict, zero supersessions, and no claim from Doc D.
+   Root cause is extraction, not the status rules: the extractor folds Doc A's
+   statement and Doc C's statement into one claim (often with claim_date
+   `2026-02-05` or `null`), which both removes the old/new pair a supersession
+   needs and puts the surviving pair on the same date — so `decide_status()`
+   applies the documented rule and returns `conflict`. `verifier.py` and the
+   status rules were not modified; no seed sentence was rewritten to force a
+   result. The uncertain case also cannot appear while Doc D is never extracted.
+   Owner also comes back `null`, which adds "Missing owner." to the notes.
+8. **Cuts.** No extra seed documents, no pipeline/prompt changes, no
+   frontend redesign. Per-evidence document dates are still not shown in the
+   report (Phase 4 only renders the claim's own date), because the phase limits
+   changes to the button and the banner.
+9. **Browser-tool note.** Synthetic `preview_click` on the query page did not
+   reach React after a full reload, so the demo button was exercised through a
+   programmatic `element.click()` in the page; the app handler itself is fine
+   (the fetch and navigation happen).

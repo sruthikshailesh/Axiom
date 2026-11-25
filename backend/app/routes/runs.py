@@ -103,6 +103,7 @@ def get_run(run_id: int, db: Session = Depends(get_db)):
         "id": run.id,
         "question": run.question,
         "status": run.status,
+        "demo": run.demo,
         "error": run.error,
         "created_at": run.created_at,
         "finished_at": run.finished_at,

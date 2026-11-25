@@ -1,0 +1,9 @@
+Project Lantern is an internal document search tool. This note records the original architecture decision for the project, taken before implementation started, and explains what the design currently assumes.
+
+The search layer uses Elasticsearch for all document indexing and ranking.
+
+We chose this technology because the team already had operational experience with it and because relevance tuning was expected to matter more than raw storage cost. Documents are ingested as plain text, split into passages, and indexed in a single Elasticsearch cluster; queries are answered by the same cluster.
+
+At the time of writing the rest of the stack is deliberately small: a web frontend, a thin API service, and PostgreSQL for user accounts and saved searches. Only the search technology is handled outside PostgreSQL.
+
+This document is the baseline for later changes. Any change to the search layer should be recorded in a newer note, so that a reader can see both the original decision and the reason it changed.

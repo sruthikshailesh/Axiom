@@ -5,11 +5,12 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.db import engine
+from app.routes import demo as demo_routes
 from app.routes import runs as run_routes
 from app.routes import search as search_routes
 from app.routes import sources as source_routes
 
-app = FastAPI(title="AXIOM", version="0.4.0")
+app = FastAPI(title="AXIOM", version="0.5.0")
 
 # Explicit loopback origins only: never a wildcard.
 app.add_middleware(
@@ -23,6 +24,7 @@ app.add_middleware(
 app.include_router(source_routes.router)
 app.include_router(search_routes.router)
 app.include_router(run_routes.router)
+app.include_router(demo_routes.router)
 
 
 @app.get("/health")

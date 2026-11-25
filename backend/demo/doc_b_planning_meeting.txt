@@ -1,0 +1,9 @@
+Notes from the Lantern planning meeting. Attendees reviewed cost, infrastructure and the current state of the project.
+
+The team agreed that Elasticsearch has been dropped from the search layer because of cost and infrastructure complexity.
+
+The main driver was operational: running a separate cluster for a small internal tool added a second system to upgrade, monitor and back up, and the hosting and licence cost was growing. The team will use PostgreSQL full-text search instead. Documents stay chunked as they are today; ranking will use PostgreSQL relevance functions, and the API service will query the database directly. No second search technology will be added to the stack during this phase.
+
+This changes the original decision recorded in the architecture note. The meeting did not settle the migration sequence, and the owner of the migration is still to be confirmed. A follow-up note will record the cut-over date once the work is scheduled.
+
+For now the decision is to stop adding new Elasticsearch features and to prepare the PostgreSQL path. The project should not be treated as migrated until a later note says so.

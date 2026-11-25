@@ -1,0 +1,7 @@
+A short status note from the developer working on the Lantern search migration. It records what is currently true in the running system, not what was agreed.
+
+Elasticsearch still handles all document ranking, so the migration to PostgreSQL is not finished.
+
+Indexing has been partially reworked, but queries are still answered by the Elasticsearch cluster because the PostgreSQL ranking scores are not good enough on the longer documents yet. No cut-over date has been agreed. This status may conflict with the planning meeting notes; it describes the running system on the same day.
+
+The original decision to use Elasticsearch as the search technology is therefore still what the project runs on. The team's decision to change it has not been completed. Further work needs the ranking quality issue resolved first.

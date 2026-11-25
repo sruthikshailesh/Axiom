@@ -6,6 +6,7 @@ from typing import List, Optional
 from sqlalchemy import (
     REAL,
     BigInteger,
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Text,
+    false,
     func,
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR
@@ -80,6 +82,9 @@ class Run(Base):
         DateTime(timezone=True), nullable=True
     )
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    demo: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=false()
+    )
 
     claims: Mapped[List["Claim"]] = relationship(
         back_populates="run", cascade="all, delete-orphan", order_by="Claim.id"
