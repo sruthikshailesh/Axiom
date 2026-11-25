@@ -370,3 +370,108 @@ claims/runs/evidence/conflicts/supersession tables, no frontend changes.
 7. **Packages.** None added. **Cuts.** None: every item was completed inside the time
    box. The known Phase 5b limitation (Doc D's claim verifies instead of staying
    uncertain) is unchanged and still disclosed in the Phase 5b section.
+
+## Phase 7 — Packaging for the BUiLDX submission
+
+1. **The frontend was not in the repository. This was the blocking problem of the phase.**
+   `frontend/` had been scaffolded with `create-vite`, which made it its own git repository,
+   and the root repo had committed it as a single gitlink (`git ls-files -s frontend` → mode
+   `160000`, one entry). GitHub therefore held a pointer to a commit that was never pushed:
+   no React source, no `package.json`, no `src/`. The nested `frontend/.git` was moved out of
+   the tree (to `/tmp/axiom-frontend-nested-git-backup`, outside the project) so the directory
+   is ordinary files again, `git rm --cached frontend` dropped the gitlink, and the 19
+   frontend files were added to the root repository. The nested repo's working tree was
+   dirty at the time, so the files added are the current state of the code, not the old
+   `ded1c06` snapshot. `node_modules/` and `dist/` stay ignored (root `.gitignore` plus
+   `frontend/.gitignore`).
+
+2. **The repository was private, and the remote was stale.** A logged-out
+   `GET https://api.github.com/repos/sruthikshailesh/Axiom` returned 404 while
+   `git ls-remote` worked, i.e. private. It was set to public through the GitHub API with the
+   credential already stored in this machine's git credential helper (the token was never
+   printed and is not in any file). The remote was also three commits behind local `main`
+   (Phase 5, 5b and 6 had never been pushed); Phase 7's commit is the first push since
+   `8c0c448`.
+
+3. **README structure.** Written in exactly the requested order: title and tagline, overview,
+   problem statement, proposed solution, key features, known limitations, technologies used,
+   installation and setup (prerequisites, then database, backend, frontend in order),
+   how to run, architecture (Mermaid plus a text workflow), team members and contributions,
+   AI assistance, demo data notice. No section is empty. Nothing was invented: the feature
+   list contains only behaviour that was executed in Phases 2–6, and the five limitations
+   (Doc D's claim verifying instead of staying uncertain, no OCR, no authentication, results
+   depending on the LLM provider, several supersession rows describing one change, no
+   pagination) are the real ones, not placeholders.
+
+4. **README claims kept deliberately small.** Prerequisites state Node 20.19+/22.12+ because
+   Vite 8 requires it (tested on Node 24.20.0, Python 3.9.6, Docker 29.9.2). The README does
+   not claim a specific model: the `.env.example` default (`gpt-4o-mini`) is an example, and
+   the limitation section says plainly that claim wording and therefore the findings vary by
+   model. No benchmark, accuracy figure or "production ready" claim appears anywhere.
+
+5. **Team section.** One entry only, as instructed: "Sruthik Shailesh — solo developer:
+   design, backend, frontend, pipeline, testing, and documentation." No other names, no
+   invented roles.
+
+6. **`backend/.env.example`** now carries placeholders only: `LLM_API_KEY=your_key_here`
+   (it was an empty value, which read as "something is missing" rather than "fill this in"),
+   plus `LLM_PROVIDER`, `LLM_MODEL`, `LLM_BASE_URL` and `DATABASE_URL` matching the compose
+   defaults. No real value is in the file. `backend/.env` remains untracked
+   (`git ls-files backend/.env` prints nothing).
+
+7. **Secret scan.** `git grep -n -i -E "gsk_|sk-|api[_-]?key *= *[A-Za-z0-9]" -- ':!NOTES.md'`
+   returns: the placeholder line in `README.md` and `backend/.env.example`
+   (`LLM_API_KEY=your_key_here`), the two deliberately fake literals in
+   `backend/tests/test_hardening.py` (`sk-should-not-leak`, used to assert that a provider
+   error body never reaches the run's error message), and one false positive in the minified
+   `frontend/public/favicon.svg` path data. No real key is present, so nothing was removed
+   and no key needed rotating. The real key exists only in `backend/.env`, which is
+   gitignored and untracked.
+
+8. **`docker-compose.yml`, `backend/requirements.txt`, `frontend/package.json`.**
+   Copied unchanged into the fresh clone and installed from scratch there: `docker compose up
+   -d` reached `healthy`, `pip install -r requirements.txt` succeeded on Python 3.9.6, and
+   `npm install` succeeded on Node 24.20.0 (it warns that `fsevents` has an install script not
+   covered by the npm 11 allow-scripts list — a warning, not a failure, and not needed on
+   Linux). No pin was changed.
+
+9. **Fresh-clone test (first pass).** `git clone https://github.com/sruthikshailesh/Axiom.git
+   axiom-fresh` into `/tmp`, then only the README followed: compose up, venv, pip, `cp
+   .env.example .env` + key, `alembic upgrade head` (four migrations applied to an empty
+   volume), `uvicorn`, `npm install`, `npm run dev`. `/health` answered 200, the frontend
+   served 200 on an empty source list, and **Load demo** produced run #1 with the synthetic
+   banner, 4 claims, 2 supersessions and 1 conflict — the same shape as the development
+   environment. The fresh clone got its own database volume (`axiom-fresh_axiom_pgdata`), so
+   nothing was inherited from the development data. The throwaway clone was deleted at the
+   end of the phase, because its untracked `backend/.env` held a copy of the key; the
+   development stack was restarted from its own volume, which still had its data.
+
+10. **README steps corrected after that pass.**
+    - Step 2: added the port note — the existing development container was holding 5432, and
+      `docker compose up -d` in the fresh clone failed to bind until it was stopped. A reader
+      with any local PostgreSQL would hit the same wall, so the README now says to free 5432.
+    - Step 5: made explicit that `uvicorn` must run from `backend/`, because
+      `pydantic-settings` reads `.env` relative to the working directory; starting it from the
+      repository root silently loses `LLM_API_KEY` (the run then fails with the "not
+      configured" message rather than reading the file).
+    - "How to run": replaced the awkward "use `localhost`, not `127.0.0.1`" wording with the
+      actual rule (pick one origin per session so the remembered last-run link resolves).
+    - Prerequisites: noted that `venv` must be available (`python3-venv` on Debian/Ubuntu),
+      which is the first failure a Ubuntu user would hit at `python3 -m venv .venv`.
+    The steps that worked were left alone; the clone was not re-run after these wording-only
+    edits, since none of them changes a command that executes.
+
+11. **BUiLDX AI-tool policy — check still pending.** The public BUiLDX Hackathon listing
+    (Code-A-Nova, Unstop) shows no AI-tool clause in its rules; the event page is closed and
+    its rules text was not available beyond the overview. Several unrelated events use the
+    same name (BuildX'26 at IIT Kharagpur, BUiLDX × UpLearn), so no single policy could be
+    confirmed for this submission. The README's AI-assistance paragraph therefore states the
+    position the stricter published policies require — AI assistants were used, they drafted
+    code, tests and documentation, and the developer reviewed and ran everything — and this
+    item stays open until the organisers' policy is confirmed.
+
+12. **Packages and cuts.** No package was added in this phase. No application, pipeline,
+    verifier or seed-document change was made; the Phase 5b limitation (Doc D's claim verifies
+    instead of staying uncertain) is still disclosed in the README's limitations section and
+    in the Phase 5b notes above. The only code change is the removal of the nested
+    `frontend/.git` (repository metadata, not application code).

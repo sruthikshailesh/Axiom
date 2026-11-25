@@ -128,7 +128,7 @@ These are real, current limitations — not roadmap items presented as finished 
 ### Prerequisites
 
 - **Docker** with Compose v2 (for PostgreSQL).
-- **Python 3.9 or newer** (`python3 --version`).
+- **Python 3.9 or newer** (`python3 --version`), with `venv` available (on Debian/Ubuntu install `python3-venv`).
 - **Node.js 20.19+ or 22.12+** and npm (required by Vite 8; tested on Node 24.20).
 - A key for an **OpenAI-compatible LLM API**. The model must be able to return JSON in a
   chat completion. Nothing else in the project needs an account or a paid service.
@@ -151,6 +151,9 @@ docker compose up -d
 This starts PostgreSQL 16 on `localhost:5432` with the database `axiom`, user `axiom`,
 password `axiom`, in a named volume. Confirm it is ready with
 `docker compose ps` (status `healthy`).
+
+If a PostgreSQL server is already listening on port 5432 (another container, or a local
+install), stop it first: this container needs that port and will not start without it.
 
 ### 3. Install and configure the backend
 
@@ -189,6 +192,8 @@ alembic upgrade head
 
 ### 5. Start the backend
 
+Run this from the `backend/` directory — the app reads `backend/.env` from there:
+
 ```bash
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
@@ -208,9 +213,9 @@ npm run dev
 ## How to run
 
 With the database container, the backend on port 8000 and the frontend on port 5173 all
-running, open **<http://localhost:5173>** (use `localhost`, not `127.0.0.1:5173`: the
-backend allows both, but keep one origin for the whole session so the saved last-run link
-resolves).
+running, open **<http://localhost:5173>** in a browser. Stay on that one origin for the
+session (the backend also allows `127.0.0.1:5173`) so the remembered last-run link keeps
+working.
 
 - **Run the demo.** On the Query view, click **Load demo**. This inserts four synthetic
   documents into an empty database, starts a run with the preset question, and opens the
