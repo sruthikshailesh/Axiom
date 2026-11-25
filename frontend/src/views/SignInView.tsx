@@ -3,19 +3,57 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { errorMessage, login } from '../api'
 import { getToken, setToken } from '../session'
 
-const GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<>/{}+=·—'.split('')
+const WORKFLOW = ['UPLOAD', 'RESEARCH', 'EXTRACT', 'VERIFY', 'REPORT']
+
+const GLYPHS = '{}[]/\\<>0123456789#|—·'.split('')
+
+interface DriftNode {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  radius: number
+}
 
 interface Glyph {
   x: number
   y: number
   size: number
-  speed: number
   alpha: number
   char: string
+  drift: number
 }
 
-/** Faint dusty-purple characters drifting down; still when motion is reduced. */
-function GlyphField() {
+function seedNodes(width: number, height: number): DriftNode[] {
+  const count = Math.min(44, Math.max(16, Math.round((width * height) / 30000)))
+  return Array.from({ length: count }, () => ({
+    x: Math.random() * width,
+    y: Math.random() * height,
+    vx: (Math.random() - 0.5) * 0.22,
+    vy: (Math.random() - 0.5) * 0.22,
+    radius: 1.1 + Math.random() * 1.5,
+  }))
+}
+
+function seedGlyphs(width: number, height: number): Glyph[] {
+  const count = Math.min(26, Math.max(10, Math.round((width * height) / 42000)))
+  return Array.from({ length: count }, () => ({
+    x: Math.random() * width,
+    y: Math.random() * height,
+    size: 11 + Math.random() * 9,
+    alpha: 0.04 + Math.random() * 0.07,
+    char: GLYPHS[Math.floor(Math.random() * GLYPHS.length)],
+    drift: 0.03 + Math.random() * 0.08,
+  }))
+}
+
+/**
+ * The left column's background: faint dusty-purple nodes with thin edges, plus a
+ * few drifting document-like glyphs. It draws one still frame while the page is
+ * hidden, under `prefers-reduced-motion: reduce`, or when the caller asks for a
+ * still frame; in every one of those cases the animation loop is never started.
+ */
+function NodeField({ still }: { still: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {
@@ -27,41 +65,75 @@ function GlyphField() {
     // Explicit types so the nested drawing helpers keep the narrowed values.
     const canvas: HTMLCanvasElement = node
     const context: CanvasRenderingContext2D = painter
-
     const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+
+    let nodes: DriftNode[] = []
     let glyphs: Glyph[] = []
     let frame: number | null = null
     let width = 0
     let height = 0
 
-    function seed() {
-      const count = Math.max(28, Math.round((width * height) / 38000))
-      glyphs = Array.from({ length: count }, () => ({
-        x: Math.random() * width,
-        y: Math.random() * height,
-        size: 11 + Math.random() * 15,
-        speed: 0.08 + Math.random() * 0.35,
-        alpha: 0.05 + Math.random() * 0.16,
-        char: GLYPHS[Math.floor(Math.random() * GLYPHS.length)],
-      }))
+    function measure() {
+      const rect = canvas.getBoundingClientRect()
+      width = Math.max(1, Math.round(rect.width))
+      height = Math.max(1, Math.round(rect.height))
+      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+      canvas.width = Math.floor(width * dpr)
+      canvas.height = Math.floor(height * dpr)
+      context.setTransform(dpr, 0, 0, dpr, 0, 0)
     }
 
     function draw() {
-      if (!context) return
       context.clearRect(0, 0, width, height)
+
+      const reach = Math.min(160, Math.max(96, width / 5))
+      context.lineWidth = 1
+      for (let i = 0; i < nodes.length; i += 1) {
+        const a = nodes[i]
+        for (let j = i + 1; j < nodes.length; j += 1) {
+          const b = nodes[j]
+          const dx = a.x - b.x
+          const dy = a.y - b.y
+          const distance = Math.hypot(dx, dy)
+          if (distance > reach) continue
+          // Fainter as the two nodes drift apart.
+          const alpha = 0.2 * (1 - distance / reach)
+          context.strokeStyle = `rgba(139, 122, 168, ${alpha.toFixed(3)})`
+          context.beginPath()
+          context.moveTo(a.x, a.y)
+          context.lineTo(b.x, b.y)
+          context.stroke()
+        }
+      }
+
+      context.fillStyle = 'rgba(139, 122, 168, 0.42)'
+      for (const point of nodes) {
+        context.beginPath()
+        context.arc(point.x, point.y, point.radius, 0, Math.PI * 2)
+        context.fill()
+      }
+
       context.textBaseline = 'middle'
       for (const glyph of glyphs) {
         context.font = `${glyph.size}px "Space Grotesk", ui-monospace, monospace`
-        context.fillStyle = `rgba(139, 122, 168, ${glyph.alpha})`
+        context.fillStyle = `rgba(139, 122, 168, ${glyph.alpha.toFixed(3)})`
         context.fillText(glyph.char, glyph.x, glyph.y)
       }
     }
 
     function step() {
+      for (const point of nodes) {
+        point.x += point.vx
+        point.y += point.vy
+        if (point.x < 0 || point.x > width) point.vx *= -1
+        if (point.y < 0 || point.y > height) point.vy *= -1
+        point.x = Math.min(width, Math.max(0, point.x))
+        point.y = Math.min(height, Math.max(0, point.y))
+      }
       for (const glyph of glyphs) {
-        glyph.y += glyph.speed
-        if (glyph.y > height + 20) {
-          glyph.y = -20
+        glyph.y -= glyph.drift
+        if (glyph.y < -20) {
+          glyph.y = height + 20
           glyph.x = Math.random() * width
           glyph.char = GLYPHS[Math.floor(Math.random() * GLYPHS.length)]
         }
@@ -77,18 +149,9 @@ function GlyphField() {
       }
     }
 
-    function sync() {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      width = window.innerWidth
-      height = window.innerHeight
-      canvas.width = Math.floor(width * dpr)
-      canvas.height = Math.floor(height * dpr)
-      context.setTransform(dpr, 0, 0, dpr, 0, 0)
-    }
-
     function restart() {
       stop()
-      if (motionQuery.matches || document.hidden) {
+      if (still || motionQuery.matches || document.hidden) {
         draw()
         return
       }
@@ -96,13 +159,15 @@ function GlyphField() {
     }
 
     function onResize() {
-      sync()
-      seed()
+      measure()
+      nodes = seedNodes(width, height)
+      glyphs = seedGlyphs(width, height)
       restart()
     }
 
-    sync()
-    seed()
+    measure()
+    nodes = seedNodes(width, height)
+    glyphs = seedGlyphs(width, height)
     restart()
 
     window.addEventListener('resize', onResize)
@@ -115,9 +180,51 @@ function GlyphField() {
       document.removeEventListener('visibilitychange', restart)
       motionQuery.removeEventListener('change', restart)
     }
-  }, [])
+  }, [still])
 
-  return <canvas ref={canvasRef} className="signin-canvas" aria-hidden="true" />
+  return <canvas ref={canvasRef} className="auth-canvas" aria-hidden="true" />
+}
+
+function AxiomMark() {
+  return (
+    <svg className="auth-mark" viewBox="0 0 32 36" width="30" height="34" aria-hidden="true">
+      <line x1="4" y1="32" x2="16" y2="5" />
+      <line x1="16" y1="5" x2="28" y2="32" />
+      <line x1="9.6" y1="23" x2="22.4" y2="23" />
+      <circle cx="16" cy="5" r="2.6" />
+    </svg>
+  )
+}
+
+function WarningTriangle() {
+  return (
+    <svg className="auth-status-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+      <path d="M10 2.8 18 17H2Z" />
+      <line x1="10" y1="8" x2="10" y2="12" />
+      <circle cx="10" cy="14.5" r="0.85" />
+    </svg>
+  )
+}
+
+function EyeIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      className="auth-eye-icon"
+      viewBox="0 0 24 24"
+      width="19"
+      height="19"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="2.9" />
+      {open ? null : <line x1="4.5" y1="19.5" x2="19.5" y2="4.5" />}
+    </svg>
+  )
 }
 
 function SignInView() {
@@ -128,8 +235,18 @@ function SignInView() {
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [revealPassword, setRevealPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [still, setStill] = useState(false)
+
+  useEffect(() => {
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const sync = () => setStill(motionQuery.matches)
+    sync()
+    motionQuery.addEventListener('change', sync)
+    return () => motionQuery.removeEventListener('change', sync)
+  }, [])
 
   if (getToken()) return <Navigate to="/dashboard" replace />
 
@@ -152,57 +269,130 @@ function SignInView() {
   const message = error ?? stateMessage
 
   return (
-    <div className="signin">
-      <GlyphField />
-      <div className="signin-panel">
-        <h1 className="signin-title">AXIOM</h1>
-        <p className="signin-motto">
-          Every claim traceable. Every conflict visible. Every uncertainty stated.
-        </p>
+    <div className="auth-page">
+      <section className="auth-left">
+        <NodeField still={still} />
+        <div className="auth-left-inner">
+          <header className="auth-brand">
+            <div className="auth-brand-row">
+              <AxiomMark />
+              <span className="auth-wordmark">AXIOM</span>
+            </div>
+            <p className="auth-brand-sub">RESEARCH INTELLIGENCE</p>
+          </header>
 
-        <form className="signin-form" onSubmit={onSubmit}>
-          <label className="field">
-            <span className="field-label">Username</span>
-            <input
-              className="input"
-              type="text"
-              autoComplete="username"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              disabled={busy}
-              required
-            />
-          </label>
-          <label className="field">
-            <span className="field-label">Password</span>
-            <input
-              className="input"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              disabled={busy}
-              required
-            />
-          </label>
+          <div className="auth-hero">
+            <h1 className="auth-headline">
+              Every claim <span className="auth-gold">traceable</span>.
+              <br />
+              Every conflict <span className="auth-gold">visible</span>.
+            </h1>
+            <p className="auth-subline">
+              Evidence first. Conflicts shown. Uncertainty stated.
+            </p>
+          </div>
 
-          <button
-            className="button signin-submit"
-            type="submit"
-            disabled={busy || !username.trim() || !password}
-          >
-            {busy ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
+          <div className="auth-left-foot">
+            <ol className="auth-flow" aria-label="How a run moves">
+              {WORKFLOW.map((step, index) => (
+                <li
+                  key={step}
+                  className={
+                    index === 0 ? 'auth-flow-step auth-flow-step-active' : 'auth-flow-step'
+                  }
+                >
+                  <span className="auth-flow-dot" aria-hidden="true" />
+                  <span className="auth-flow-label">{step}</span>
+                </li>
+              ))}
+            </ol>
 
-        {message ? (
-          <p className="signin-error" role="alert">
-            {message}
-          </p>
-        ) : null}
+            <div className="auth-status-bar">
+              <span className="auth-status-tag">
+                <WarningTriangle />
+                <span>CONFLICT</span>
+              </span>
+              <span className="auth-status-rule" aria-hidden="true" />
+              <p className="auth-status-text">
+                Two documents disagree, or a newer record replaces an older one.
+              </p>
+            </div>
+            <p className="auth-status-legend">
+              Statuses: verified, conflict, uncertain, superseded.
+            </p>
+          </div>
+        </div>
+      </section>
 
-        <p className="signin-note">One local account. Not production authentication.</p>
-      </div>
+      <section className="auth-right">
+        <div className="auth-card">
+          <h2 className="auth-card-title">Sign in</h2>
+          <span className="auth-card-underline" aria-hidden="true" />
+
+          <form className="auth-form" onSubmit={onSubmit}>
+            <div className="auth-field">
+              <label className="auth-label" htmlFor="auth-username">
+                Username
+              </label>
+              <input
+                id="auth-username"
+                className="auth-input"
+                type="text"
+                autoComplete="username"
+                placeholder="Your username"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                disabled={busy}
+                required
+              />
+            </div>
+
+            <div className="auth-field">
+              <label className="auth-label" htmlFor="auth-password">
+                Password
+              </label>
+              <div className="auth-password-row">
+                <input
+                  id="auth-password"
+                  className="auth-input"
+                  type={revealPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="Your password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  disabled={busy}
+                  required
+                />
+                <button
+                  className="auth-eye"
+                  type="button"
+                  aria-label={revealPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setRevealPassword((current) => !current)}
+                  disabled={busy}
+                >
+                  <EyeIcon open={!revealPassword} />
+                </button>
+              </div>
+            </div>
+
+            <button
+              className="auth-submit"
+              type="submit"
+              disabled={busy || !username.trim() || !password}
+            >
+              {busy ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+
+          {message ? (
+            <p className="auth-error" role="alert">
+              {message}
+            </p>
+          ) : null}
+
+          <p className="auth-card-foot">One local account. Not production authentication.</p>
+        </div>
+      </section>
     </div>
   )
 }

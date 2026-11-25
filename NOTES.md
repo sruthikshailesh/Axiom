@@ -664,3 +664,87 @@ claims/runs/evidence/conflicts/supersession tables, no frontend changes.
    `git push --force-with-lease`, so the published history contains no copy of it. This is the
    only history rewrite in the project; nothing else was force-pushed. The lesson is recorded
    here rather than quietly fixed: a scan command that contains a secret is itself a leak.
+
+## Phase 8b — Sign-in split-screen redesign
+
+1. **What was removed, and why.** The sign-in card had a `Create account` tab, a
+   `Forgot password?` link, and `Terms` / `Privacy` links. AXIOM has exactly one local
+   account, no registration, no password reset and no legal pages, so every one of them was
+   a dead control that promised behaviour the app does not have. All three are gone: the card
+   is a single form with no tabs, and the page now contains **no links at all** (checked: the
+   rendered document has zero `<a>` elements). The `One local account. Not production
+   authentication.` footer stays, because it is the honest statement of what the account is.
+
+2. **Sign-in logic untouched.** `login()`, `setToken()`/`getToken()`, `errorMessage()`, the
+   `busy` flag, the `busy ? 'Signing in…' : 'Sign in'` label and the existing disabled rule
+   are the Phase 8 code, only re-hosted in the new markup. `api.ts`, `session.ts`, `App.tsx`,
+   the route guard, sign-out and the 401 handling were not opened. No backend file changed and
+   no package was added; the redesign is JSX plus plain CSS.
+
+3. **Layout.** One grid, `.auth-page`: a single column below 900px and
+   `minmax(0, 1.08fr) minmax(400px, 0.92fr)` at 900px and wider, so 900px is the desktop
+   breakpoint exactly as specified. At 1440px the columns compute to 777.6px and 662.4px, the
+   left column is the full 900px of viewport height, and the card sits centred in the right
+   column. Below 900px the left column collapses to its content height, `.auth-left-foot`
+   (workflow strip plus status bar) is `display: none`, and the card follows the headline, so
+   the mobile page shows wordmark, headline, subline, then the card.
+
+4. **Left column.** Inline SVG mark only (three lines forming the `A`, gold dot at the apex —
+   no image file, `aria-hidden`); `AXIOM` wordmark in gold with `0.42em` letter-spacing and
+   `RESEARCH INTELLIGENCE` in small grey capitals beneath it; the two-line headline with
+   `traceable` and `visible` in `var(--gold)`; the muted subline; the five-step strip with the
+   gold UPLOAD dot; then the rounded status bar (red warning triangle plus `CONFLICT`, a
+   divider, and the sentence) and the one-line status legend underneath.
+
+5. **The background canvas** is one `<canvas>` inside `.auth-left` (not the whole page), drawn
+   with `requestAnimationFrame`: drifting nodes joined by thin edges that fade with distance,
+   plus a few low-opacity braces/slashes/digits. It is the Phase 8 loop's structure — one
+   `restart()` that draws a single still frame and returns instead of scheduling when
+   `prefers-reduced-motion: reduce` matches, when `document.hidden` is true, or when the
+   component's `still` state (the same media query, watched with `addEventListener('change')`)
+   is set. Nothing animates while the tab is hidden, and toggling the OS setting takes effect
+   without a reload.
+
+6. **Colours and fonts.** `--gold` was already `#c9a86a`, so no variable was added; the
+   redesign uses the existing `--bg`, `--surface`, `--surface-2`, `--accent`,
+   `--accent-line`, `--accent-soft` and `--muted`. The status bar's icon and label use
+   `var(--conflict)`, the same red (`#e06666`) the report badges use for a conflict — measured
+   on the page as `rgb(224, 102, 102)` for both. Fonts are unchanged: headings compute to
+   `Space Grotesk`, body text to `Inter`, from the same `index.html` link.
+
+7. **Accessibility.** Each input has a real `<label for>` (the old markup wrapped the input
+   in the label, which is why the password field is now a `label` plus an input/button row); the
+   error box keeps `role="alert"`; the eye toggle is a `<button type="button">` whose
+   `aria-label` switches between `Show password` and `Hide password`, and it lives outside the
+   label so clicking it cannot be read as clicking the field. Every control has a visible
+   `:focus-visible` ring: inputs `2px var(--accent)`, the eye and the submit button
+   `2px var(--gold)`. Tabbing the form in order (username → password → eye → submit) showed
+   `:focus-visible` true and a 2px outline on each of the four.
+
+8. **Motion.** The UPLOAD dot pulses with one 2.8s `auth-pulse` keyframe; the stylesheet's
+   `prefers-reduced-motion: reduce` block sets `animation: none` on it, and the existing global
+   rule already collapses every other animation/transition duration.
+
+9. **What was checked, and how.** Wrong password → `Incorrect username or password.` in a
+   red-bordered box inside the card with `role="alert"`, URL still `/sign-in`; correct
+   password → `/dashboard`; the eye toggle flips `type` between `password` and `text` and swaps
+   its label both ways; 820px viewport → one column, strip and status bar at zero size, card
+   below the headline, no horizontal overflow; a clean reload logs no console errors (the only
+   `console` errors in the session were the browser's own `401` resource lines from the
+   deliberately wrong passwords); `npm run build` (tsc + vite) passes. `preview_click` reached
+   the page this time, so the submit button and the eye were exercised with real mouse input.
+
+10. **Reduced motion was verified as a code path, not by toggling the OS setting.** This
+    preview tab is hidden (`document.hidden === true`), and Chromium runs no animation frames
+    in a hidden tab, so frame counting cannot distinguish the two states here — the first
+    attempt measured zero frames either way. Instead `requestAnimationFrame` was stubbed to
+    record schedulings: with motion allowed the component schedules the loop (2 registrations
+    on mount, and ticking one callback scheduled another, so the loop reschedules itself);
+    with `matchMedia` reporting `reduce` the same mount scheduled **0** and the canvas still
+    held a drawn still frame (3,330 non-transparent pixels). The dot's stop is the live
+    stylesheet rule quoted in item 8. What was *not* done is flipping macOS Reduce Motion and
+    watching the page, because the browser exposes no media emulation here.
+
+11. **Cuts.** No avatar, no illustration, no second canvas, no theme switch, no animation on
+    the strip beyond the pulse, and no change to the desktop shell, the other views, or any
+    backend file.
