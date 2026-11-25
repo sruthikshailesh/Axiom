@@ -30,8 +30,48 @@ RETRY_STATUSES = (429, 500, 502, 503, 504)
 JSON_VALIDATION_ERROR = "json_validate_failed"
 
 
+# Every LLM failure carries a message a non-developer can read in the UI. The
+# raw provider detail stays in the exception text and in the backend log only.
+MISSING_KEY_MESSAGE = (
+    "The language model is not configured. Set LLM_API_KEY in backend/.env, "
+    "then start the run again."
+)
+MISCONFIGURED_MESSAGE = (
+    "The language model is not configured correctly. Check LLM_PROVIDER and "
+    "LLM_MODEL in backend/.env, then start the run again."
+)
+BAD_KEY_MESSAGE = (
+    "The language model rejected the API key. Check LLM_API_KEY in backend/.env, "
+    "then start the run again."
+)
+RATE_LIMIT_MESSAGE = (
+    "The language model is busy (rate limited). Wait a minute and start the run again."
+)
+TIMEOUT_MESSAGE = "The language model did not answer in time. Start the run again."
+NETWORK_MESSAGE = (
+    "Could not reach the language model service. Check the network, then start "
+    "the run again."
+)
+UNAVAILABLE_MESSAGE = (
+    "The language model service is unavailable right now. Start the run again."
+)
+BAD_RESPONSE_MESSAGE = (
+    "The language model returned a response AXIOM could not use. Start the run again."
+)
+DEFAULT_PUBLIC_MESSAGE = "The language model call failed. Start the run again."
+
+
 class LLMError(RuntimeError):
-    """Raised when the provider is misconfigured or returns unusable JSON."""
+    """Raised when the provider is misconfigured or returns unusable JSON.
+
+    ``str(error)`` is the raw detail for the backend log; ``public_message`` is
+    the sentence shown to the user on the run.
+    """
+
+    def __init__(self, message: str, public_message: str = DEFAULT_PUBLIC_MESSAGE) -> None:
+        super().__init__(message)
+        self.public_message = public_message
+
 
 def _config() -> Dict[str, str]:
     provider = (settings.llm_provider or "openai").strip().lower()
@@ -40,17 +80,31 @@ def _config() -> Dict[str, str]:
     base_url = (settings.llm_base_url or DEFAULT_BASE_URL).strip().rstrip("/")
 
     if not api_key:
-        raise LLMError("LLM_API_KEY is not set")
+        raise LLMError("LLM_API_KEY is not set", MISSING_KEY_MESSAGE)
     if provider not in SUPPORTED_PROVIDERS:
         raise LLMError(
             "Unsupported LLM_PROVIDER: {}. Supported providers: {}.".format(
                 provider, ", ".join(SUPPORTED_PROVIDERS)
-            )
+            ),
+            MISCONFIGURED_MESSAGE,
         )
     if not model:
-        raise LLMError("LLM_MODEL is not set")
+        raise LLMError("LLM_MODEL is not set", MISCONFIGURED_MESSAGE)
 
     return {"provider": provider, "api_key": api_key, "model": model, "base_url": base_url}
+
+def _public_message_for(status: int, body: str) -> str:
+    """The user-facing sentence for one provider status code."""
+    if status in (401, 403):
+        return BAD_KEY_MESSAGE
+    if status == 429:
+        return RATE_LIMIT_MESSAGE
+    if status >= 500:
+        return UNAVAILABLE_MESSAGE
+    if status == 400 and JSON_VALIDATION_ERROR in body:
+        return BAD_RESPONSE_MESSAGE
+    return DEFAULT_PUBLIC_MESSAGE
+
 
 def _chat(config: Dict[str, str], messages: List[Dict[str, str]]) -> str:
     """One provider call, returning the raw assistant text."""
@@ -70,15 +124,19 @@ def _chat(config: Dict[str, str], messages: List[Dict[str, str]]) -> str:
                 response = client.post(
                     config["base_url"] + "/chat/completions", json=payload, headers=headers
                 )
+        except httpx.TimeoutException as exc:
+            response = None
+            error = LLMError("LLM request timed out: {}".format(exc), TIMEOUT_MESSAGE)
         except httpx.HTTPError as exc:
             response = None
-            error = LLMError("LLM request failed: {}".format(exc))
+            error = LLMError("LLM request failed: {}".format(exc), NETWORK_MESSAGE)
         else:
             if response.status_code < 400:
                 break
             body = response.text
             error = LLMError(
-                "LLM provider returned HTTP {}: {}".format(response.status_code, body[:300])
+                "LLM provider returned HTTP {}: {}".format(response.status_code, body[:300]),
+                _public_message_for(response.status_code, body),
             )
             retryable = response.status_code in RETRY_STATUSES or (
                 response.status_code == 400 and JSON_VALIDATION_ERROR in body
@@ -96,7 +154,9 @@ def _chat(config: Dict[str, str], messages: List[Dict[str, str]]) -> str:
     try:
         return response.json()["choices"][0]["message"]["content"] or ""
     except (ValueError, KeyError, IndexError, TypeError):
-        raise LLMError("LLM provider returned an unexpected response shape.")
+        raise LLMError(
+            "LLM provider returned an unexpected response shape.", BAD_RESPONSE_MESSAGE
+        )
 
 
 def _extract_json(raw: str) -> Dict[str, Any]:
@@ -155,5 +215,6 @@ def complete_json(system: str, user: str, schema_hint: str) -> Dict[str, Any]:
         return _extract_json(raw_retry)
     except ValueError as exc:
         raise LLMError(
-            "LLM did not return valid JSON after one retry: {}".format(exc)
+            "LLM did not return valid JSON after one retry: {}".format(exc),
+            BAD_RESPONSE_MESSAGE,
         )

@@ -316,3 +316,57 @@ claims/runs/evidence/conflicts/supersession tables, no frontend changes.
     unchanged. The report still shows more than one supersession per run (three pairs
     describing the same change), because every contradicting/superseding pair is
     stored; collapsing them is a view/verifier change and was not made.
+
+## Phase 6 — Hardening
+
+1. **Readable LLM errors everywhere (`app/llm.py`, `app/routes/runs.py`).** `LLMError`
+   now carries a `public_message` a non-developer can read; `str(error)` keeps the raw
+   provider detail for the backend log only. `execute_run()` logs the raw text with
+   `logger.error` and stores `exc.public_message` on the run. Mapping: missing key →
+   "The language model is not configured. Set LLM_API_KEY in backend/.env, then start
+   the run again."; 401/403 → "The language model rejected the API key…"; 429 after
+   retries → "The language model is busy (rate limited)…"; timeout → "The language
+   model did not answer in time…"; connection failure → "Could not reach the language
+   model service…"; 5xx → "The language model service is unavailable right now…";
+   unusable JSON / unexpected shape → "The language model returned a response AXIOM
+   could not use…". Any other pipeline exception now stores "The run failed while
+   processing its documents. Check the backend log, then start the run again." instead
+   of the raw exception text, and logs the traceback. `test_missing_api_key_fails_the_run`
+   was updated to assert the readable sentence, and `test_llm_failure_stores_only_the_readable_message`
+   asserts that a 401 body containing a fake key never reaches the run's error.
+2. **Startup sweep (`app/pipeline/run_state.py`, `app/main.py`).** `sweep_interrupted_runs()`
+   fails every run in `queued`/`researching`/`extracting`/`verifying` with
+   "Interrupted before completion. Start the run again." and a `finished_at`. It runs
+   once from a `lifespan` hook, logs the count, and never touches `completed` or
+   `failed` runs; a failure in the sweep is logged and does not stop the app.
+   `test_startup_sweep_fails_only_interrupted_runs` opens a second `TestClient` (a real
+   process start) and checks both directions.
+3. **Timeouts.** The 60 s `TIMEOUT_SECONDS` and the 4-attempt retry limit from Phase 5b
+   are unchanged. `expire_if_stale()` is a read-time check called by `GET /runs/{id}`:
+   an active run whose `created_at` is more than 10 minutes old is marked failed with
+   "Run timed out." and returned as failed. No background job was added, and no new
+   column — the run's own `created_at` is the clock. Tests: a stale run is failed on
+   read, a fresh run and an old `completed` run are left alone.
+4. **Frontend empty/error states.** Checked in the browser without restyling: the
+   Sources page shows "No sources yet. Upload a document to get started." with zero
+   sources; with the backend stopped it shows "Cannot reach the AXIOM backend at
+   http://localhost:8000. Is uvicorn running?"; `/runs/99999` shows "Run not found."
+   with a link back to the Query view; a failed run shows the error inside a panel.
+   The empty-state test used a throwaway database (`axiom_empty`) served by a temporary
+   backend on the same port, so the development data was never touched; that database
+   was dropped afterwards.
+5. **Upload guard (`frontend/src/views/SourcesView.tsx`).** The Upload button was
+   already disabled through `disabled={uploading}`, but two submits in the same tick
+   both read the old `uploading` state, so a fast double click could post twice. A
+   `useRef` flag (`uploadInFlight`) now guards `onSubmit` and is cleared in `finally`.
+   Verified by firing `form.requestSubmit()` twice in one tick from the browser: one
+   source row was created. That test source was deleted afterwards.
+6. **No unhandled exceptions (`app/main.py`).** A handler for `Exception` logs the
+   traceback with `logger.exception` and answers HTTP 500 with
+   `{"detail": "Something went wrong. Check the backend log."}`; the frontend already
+   renders `detail`, so the user sees that sentence rather than "undefined".
+   `test_unhandled_exception_returns_readable_json` forces a failure in `/search` and
+   asserts the body contains neither the exception text nor a traceback.
+7. **Packages.** None added. **Cuts.** None: every item was completed inside the time
+   box. The known Phase 5b limitation (Doc D's claim verifies instead of staying
+   uncertain) is unchanged and still disclosed in the Phase 5b section.

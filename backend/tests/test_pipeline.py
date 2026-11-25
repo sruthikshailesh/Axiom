@@ -139,6 +139,7 @@ def test_missing_api_key_fails_the_run(client, two_sources, monkeypatch) -> None
     # Settings are read once at import (from the environment and backend/.env),
     # so the missing key is simulated on the settings object, not os.environ.
     from app.config import settings
+    from app.llm import MISSING_KEY_MESSAGE
 
     monkeypatch.setattr(settings, "llm_api_key", None)
 
@@ -149,7 +150,9 @@ def test_missing_api_key_fails_the_run(client, two_sources, monkeypatch) -> None
 
     detail = _wait_for_run(client, created.json()["id"])
     assert detail["status"] == "failed"
-    assert "LLM_API_KEY is not set" in detail["error"]
+    # The run carries a readable sentence, never the raw provider or config text.
+    assert detail["error"] == MISSING_KEY_MESSAGE
+    assert "LLM_API_KEY is not set" not in detail["error"]
 
 
 def test_stages_are_reported_while_the_run_is_in_flight(client, two_sources, monkeypatch) -> None:

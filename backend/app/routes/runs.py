@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -11,9 +12,18 @@ from app.db import SessionLocal, get_db
 from app.llm import LLMError
 from app.models import Chunk, Claim, Conflict, Evidence, Run, Source, Supersession
 from app.pipeline.graph import run_pipeline
-from app.pipeline.run_state import mark_completed, mark_failed
+from app.pipeline.run_state import expire_if_stale, mark_completed, mark_failed
+
+logger = logging.getLogger("axiom.runs")
 
 router = APIRouter(prefix="/runs", tags=["runs"])
+
+# The run's error is shown to the user, so it must stay readable. Raw exception
+# text (provider bodies, stack details) goes to the backend log only.
+PIPELINE_ERROR_MESSAGE = (
+    "The run failed while processing its documents. Check the backend log, then "
+    "start the run again."
+)
 
 
 class RunRequest(BaseModel):
@@ -28,16 +38,19 @@ def execute_run(run_id: int, question: str) -> None:
             state = run_pipeline(db, run_id, question)
         except LLMError as exc:
             db.rollback()
-            mark_failed(db, run_id, "LLM error: {}".format(exc))
+            logger.error("run %s: LLM failure: %s", run_id, exc)
+            mark_failed(db, run_id, exc.public_message)
         except Exception as exc:  # noqa: BLE001 - a pipeline failure must fail the run
             db.rollback()
-            mark_failed(db, run_id, "Pipeline error: {}".format(exc))
+            logger.exception("run %s: pipeline failure", run_id)
+            mark_failed(db, run_id, PIPELINE_ERROR_MESSAGE)
         else:
             if not state.get("failed"):
                 mark_completed(db, run_id)
-    except Exception as exc:  # noqa: BLE001 - never leave a run in flight
+    except Exception:  # noqa: BLE001 - never leave a run in flight
         db.rollback()
-        mark_failed(db, run_id, "Pipeline error: {}".format(exc))
+        logger.exception("run %s: could not record the run's result", run_id)
+        mark_failed(db, run_id, PIPELINE_ERROR_MESSAGE)
     finally:
         db.close()
 
@@ -68,6 +81,10 @@ def get_run(run_id: int, db: Session = Depends(get_db)):
     run = db.get(Run, run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found.")
+
+    # Read-time timeout: a run that has been active for over 10 minutes lost its
+    # worker, so the next read reports it failed instead of running forever.
+    expire_if_stale(db, run)
 
     claims = db.scalars(
         select(Claim).where(Claim.run_id == run_id).order_by(Claim.id)
