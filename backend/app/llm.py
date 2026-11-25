@@ -12,13 +12,22 @@ per-request error rather than an import-time crash:
 from app.config import settings
 
 import json
-from typing import Any, Dict, List
+import time
+from typing import Any, Dict, List, Optional
 
 import httpx
 
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 SUPPORTED_PROVIDERS = ("openai",)
 TIMEOUT_SECONDS = 60.0
+
+# The configured model intermittently drops a connection, hits the rate limit, or
+# has its JSON rejected by the provider's validator. Those are retried a few times
+# with a short backoff (NOTES, Phase 5b); everything else fails immediately.
+MAX_ATTEMPTS = 4
+RETRY_DELAY_SECONDS = 2.0
+RETRY_STATUSES = (429, 500, 502, 503, 504)
+JSON_VALIDATION_ERROR = "json_validate_failed"
 
 
 class LLMError(RuntimeError):
@@ -53,20 +62,36 @@ def _chat(config: Dict[str, str], messages: List[Dict[str, str]]) -> str:
     }
     headers = {"Authorization": "Bearer " + config["api_key"]}
 
-    try:
-        with httpx.Client(timeout=TIMEOUT_SECONDS) as client:
-            response = client.post(
-                config["base_url"] + "/chat/completions", json=payload, headers=headers
+    response: Optional[httpx.Response] = None
+    error: Optional[LLMError] = None
+    for attempt in range(MAX_ATTEMPTS):
+        try:
+            with httpx.Client(timeout=TIMEOUT_SECONDS) as client:
+                response = client.post(
+                    config["base_url"] + "/chat/completions", json=payload, headers=headers
+                )
+        except httpx.HTTPError as exc:
+            response = None
+            error = LLMError("LLM request failed: {}".format(exc))
+        else:
+            if response.status_code < 400:
+                break
+            body = response.text
+            error = LLMError(
+                "LLM provider returned HTTP {}: {}".format(response.status_code, body[:300])
             )
-    except httpx.HTTPError as exc:
-        raise LLMError("LLM request failed: {}".format(exc))
+            retryable = response.status_code in RETRY_STATUSES or (
+                response.status_code == 400 and JSON_VALIDATION_ERROR in body
+            )
+            if not retryable:
+                raise error
 
-    if response.status_code >= 400:
-        raise LLMError(
-            "LLM provider returned HTTP {}: {}".format(
-                response.status_code, response.text[:300]
-            )
-        )
+        if attempt == MAX_ATTEMPTS - 1:
+            raise error or LLMError("LLM request failed")
+        time.sleep(RETRY_DELAY_SECONDS * (attempt + 1))
+
+    if response is None:
+        raise error or LLMError("LLM request failed")
 
     try:
         return response.json()["choices"][0]["message"]["content"] or ""

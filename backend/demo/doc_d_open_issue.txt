@@ -1,6 +1,6 @@
-Open issue raised by QA for the Lantern search project. It records the current unanswered questions after the first round of load testing.
+Open issue raised by QA for the Lantern search project: current search technology and load-testing results. It records the current unanswered questions after the first round of load testing.
 
-Search performance on large documents is unresolved, and a decision on adding a second index is pending.
+PostgreSQL full-text search is the current search technology, but its performance on large documents is unresolved, and a decision on adding a second index is pending.
 
 Testing used a set of long documents that are typical of the project's archive. Query latency on those documents is well outside the target, and the relevance of the returned passages is inconsistent. The team does not yet know whether the cause is the ranking configuration, the way documents are chunked, or the missing index.
 

@@ -31,19 +31,58 @@ def _clean_owner(value: Any) -> Optional[str]:
     return value.strip()
 
 
-def extractor_node(state: Dict[str, Any], db: Session) -> Dict[str, Any]:
-    chunks = state.get("chunks") or []
+def _raw_claims(question: str, chunks: List[Dict[str, Any]]) -> List[Any]:
+    """One extractor call; returns its unvalidated claim items."""
     data = llm.complete_json(
         prompts.EXTRACTOR_SYSTEM,
-        prompts.extractor_user(state["question"], chunks),
+        prompts.extractor_user(question, chunks),
         prompts.EXTRACTOR_SCHEMA_HINT,
     )
-
     raw_claims = data.get("claims")
     if not isinstance(raw_claims, list):
         raise LLMError("Extractor response has no 'claims' list.")
+    return raw_claims
 
+
+def _covered_chunk_ids(raw_claims: List[Any], valid_chunk_ids: Set[int]) -> Set[int]:
+    """Chunk ids that at least one returned claim cites."""
+    covered: Set[int] = set()
+    for item in raw_claims:
+        if not isinstance(item, dict):
+            continue
+        for entry in item.get("supporting") or []:
+            if not isinstance(entry, dict):
+                continue
+            chunk_id = entry.get("chunk_id")
+            if isinstance(chunk_id, bool) or not isinstance(chunk_id, int):
+                continue
+            if chunk_id in valid_chunk_ids:
+                covered.add(chunk_id)
+    return covered
+
+
+def extractor_node(state: Dict[str, Any], db: Session) -> Dict[str, Any]:
+    chunks = state.get("chunks") or []
     valid_chunk_ids: Set[int] = {chunk["chunk_id"] for chunk in chunks}
+    log: List[str] = []
+
+    raw_claims = _raw_claims(state["question"], chunks)
+
+    # Coverage repair (NOTES, Phase 5b): the model sometimes returns claims for
+    # only the chunks it finds most relevant. A chunk with no claim at all is
+    # re-extracted on its own, so no source is silently skipped.
+    missing = [
+        chunk
+        for chunk in chunks
+        if chunk["chunk_id"] not in _covered_chunk_ids(raw_claims, valid_chunk_ids)
+    ]
+    if missing:
+        for chunk in missing:
+            raw_claims = raw_claims + _raw_claims(state["question"], [chunk])
+        log.append(
+            "extractor: coverage repair re-extracted {} chunk(s)".format(len(missing))
+        )
+
     kept: List[int] = []
     dropped = 0
 
@@ -99,4 +138,4 @@ def extractor_node(state: Dict[str, Any], db: Session) -> Dict[str, Any]:
         len(kept), dropped
     )
     logger.info(message)
-    return {"claims": kept, "log": (state.get("log") or []) + [message]}
+    return {"claims": kept, "log": (state.get("log") or []) + log + [message]}

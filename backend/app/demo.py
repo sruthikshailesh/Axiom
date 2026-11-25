@@ -41,7 +41,7 @@ DEMO_DOCUMENTS: List[Dict[str, Any]] = [
     },
     {
         "filename": "doc_d_open_issue.txt",
-        "title": "[SYNTHETIC DEMO DATA] Lantern Open Issue",
+        "title": "[SYNTHETIC DEMO DATA] Lantern Open Issue (Search Performance)",
         "doc_date": "2026-03-10",
         "author": "QA Lead",
     },
@@ -57,22 +57,32 @@ def load_demo(db: Session) -> List[int]:
     """Ingest the demo documents and return their source ids.
 
     Idempotent: a source whose title already exists is reused, so running the
-    demo twice never duplicates a document.
+    demo twice never duplicates a document. If a demo file's text has changed
+    since it was ingested, its chunks are replaced (NOTES, Phase 5b).
     """
     source_ids: List[int] = []
 
     for document in DEMO_DOCUMENTS:
         title = document["title"]
-        existing = db.scalars(select(Source).where(Source.title == title)).first()
-        if existing is not None:
-            source_ids.append(existing.id)
-            continue
-
         path = DEMO_DIR / document["filename"]
         content = path.read_bytes()
         text = extract_text(document["filename"], content)
         if not text.strip():
             raise ExtractionError("Demo file {} has no text.".format(path.name))
+        texts = chunk_text(text)
+
+        existing = db.scalars(select(Source).where(Source.title == title)).first()
+        if existing is not None:
+            if [chunk.text for chunk in existing.chunks] != texts:
+                existing.doc_date = date.fromisoformat(document["doc_date"])
+                existing.author = document["author"]
+                existing.chunks = [
+                    Chunk(position=position, text=chunk)
+                    for position, chunk in enumerate(texts)
+                ]
+                db.commit()
+            source_ids.append(existing.id)
+            continue
 
         source = Source(
             title=title,
@@ -82,7 +92,7 @@ def load_demo(db: Session) -> List[int]:
         )
         source.chunks = [
             Chunk(position=position, text=chunk)
-            for position, chunk in enumerate(chunk_text(text))
+            for position, chunk in enumerate(texts)
         ]
 
         db.add(source)

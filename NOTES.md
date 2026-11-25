@@ -241,3 +241,78 @@ claims/runs/evidence/conflicts/supersession tables, no frontend changes.
    reach React after a full reload, so the demo button was exercised through a
    programmatic `element.click()` in the page; the app handler itself is fine
    (the fetch and navigation happen).
+
+## Phase 5b — Extraction fixes for the demo
+
+1. **Extractor prompt (`app/pipeline/prompts.py`).** The rules now say: exactly one
+   claim per chunk (the chunk's central statement, not a summary or several claims
+   from one chunk), never merge statements that come from different chunks or
+   different sources even on the same topic, extract a "changed / dropped / replaced
+   / pending" statement as its own claim, use the chunk header's author as `owner`
+   when the text names none, use the header's date as `claim_date` when the text
+   states none, and keep the chunk-id citation and verbatim-quote rules.
+2. **Coverage line in the user prompt.** `extractor_user()` now ends with
+   "Cover every chunk: return at least one claim that cites each of these chunk
+   ids (…) unless that chunk states no checkable fact." Without it the model
+   returned claims for only two of the four demo chunks (Phase 5's symptom). A
+   system-level "extract a claim from every chunk" wording was tried first and made
+   this model return **HTTP 400 `json_validate_failed`** every time, so it was
+   removed; the user-prompt line plus the one-claim-per-chunk rule returns all four
+   claims with the right owners and dates.
+3. **Coverage repair pass (`app/pipeline/extractor.py`) — a deviation from
+   "prompts.py only".** The model still sometimes omits a chunk entirely (run 20 of
+   Phase 5b returned three of four claims). After the first extraction, any chunk id
+   that no returned claim cites is re-extracted on its own and its claims are added,
+   with an `extractor: coverage repair re-extracted N chunk(s)` log line. This is a
+   structural guarantee that no retrieved source is silently skipped; it does not
+   touch claim validation, quote checking or the status rules.
+4. **LLM retries (`app/llm.py`) — a deviation, needed to finish the checks.** The
+   configured model (`openai/gpt-oss-20b`) intermittently returns HTTP 400
+   `json_validate_failed`, 429 rate limits and dropped connections. `_chat()` now
+   retries up to 4 attempts with a 2 s × attempt backoff for 429/5xx, connection
+   errors, and 400 responses whose body contains `json_validate_failed`; every other
+   response still fails immediately with the same `LLMError` text.
+5. **Retrieval fallback (`app/pipeline/researcher.py`).** If full-text search
+   returns at least one demo source but fewer than four, the Researcher appends the
+   first chunk (by position) of every demo source that was not returned, matched by
+   the `[SYNTHETIC DEMO DATA]` title prefix, and logs
+   `researcher: demo fallback added the top chunk from N unretrieved demo source(s)`.
+   It is scoped to the demo corpus so an ordinary run never has demo chunks injected.
+   `app/search.py` is unchanged. In the recorded runs the query returned all four
+   demo chunks on its own, so the fallback did not fire (it is covered by the new
+   test and by the retrieval call it makes).
+6. **Doc D sentence and title.** Old sentence: "Search performance on large documents
+   is unresolved, and a decision on adding a second index is pending." New sentence:
+   "PostgreSQL full-text search is the current search technology, but its performance
+   on large documents is unresolved, and a decision on adding a second index is
+   pending." The rest of the document is unchanged. Its title went from
+   `[SYNTHETIC DEMO DATA] Lantern Open Issue` to
+   `[SYNTHETIC DEMO DATA] Lantern Open Issue (Search Performance)`; the prefix is kept.
+7. **Demo source refresh.** Because the Doc D title changed and its text changed, the
+   Phase 5 demo rows in the development database were replaced: the old Doc D source
+   (title without "(Search Performance)") was deleted, and `load_demo()` now replaces
+   a demo source's chunks when the file on disk no longer matches the stored chunks
+   (old chunks are deleted, so their evidence rows cascade away). `load_demo()` is
+   still idempotent on title for unchanged files: the third and fourth `Load demo`
+   keep exactly four demo sources.
+8. **Tests.** `backend/tests/test_demo.py` gained
+   `test_demo_chunks_exist_and_retrieval_covers_all_four_sources`: it loads the demo,
+   asserts every demo source has at least one stored chunk, calls `researcher_node()`
+   with `DEMO_QUESTION` and asserts a chunk from each of the four sources comes back,
+   then runs `POST /demo/run` with `fake_llm` from `test_pipeline.py`. No real LLM is
+   called. Suite: 28 passed.
+9. **Demo outcome over three recorded runs (21, 22, 23) — check 5 fails, reported
+   rather than patched.** A supersession with the Architecture claim as old and a
+   Planning Meeting claim as new appears in 3/3 runs; the Doc C vs Doc B conflict
+   appears in 3/3 runs; owner is filled from the source author on every claim in
+   every run. Doc D's claim is **not** `uncertain`: it accords with the Planning
+   Meeting's PostgreSQL claim, so `decide_status()` returns `verified` (0.9) through
+   the mutual-support rule, and its note is empty instead of "Supported by one source
+   only." That is the rule working as specified — an uncertain Doc D claim cannot
+   exist while the Planning Meeting claim says the same thing — so `verifier.py`, the
+   status rules and the seed sentences were left alone.
+10. **Cuts.** No new seed documents, no changes to `verifier.py` / `decide_status()` /
+    the pairwise logic, no changes to Phase 4 views, and the preset question is
+    unchanged. The report still shows more than one supersession per run (three pairs
+    describing the same change), because every contradicting/superseding pair is
+    stored; collapsing them is a view/verifier change and was not made.

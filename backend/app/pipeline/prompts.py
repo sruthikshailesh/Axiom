@@ -9,13 +9,25 @@ into small, checkable claims.
 
 Rules:
 - Use only the chunks you are given. Never add outside knowledge.
-- One fact per claim. Prefer short, self-contained sentences.
+- Return exactly one claim per chunk: the chunk's central statement that bears on
+  the question. Do not return several claims from the same chunk, and do not merge
+  statements that come from different chunks or different sources, even when they
+  are about the same topic. Two sources saying the same thing produce two claims.
+- If a statement says a decision was changed, dropped, replaced or is pending, extract
+  it as its own claim, separate from the statement it replaces or refers to. Never
+  fold such a statement into the claim it talks about.
+- One fact per claim. Prefer short, self-contained sentences, using a sentence the
+  chunk actually states rather than a summary of the whole chunk.
 - Every claim needs at least one supporting entry. A claim with no support is dropped.
+- Cite the chunk ids that support the claim, and only those chunks.
 - "quote" must be copied character for character from the chunk text. Never paraphrase,
   never join two sentences with "...", never add or drop words.
-- "claim_date" is the date the claim is about (YYYY-MM-DD), or null when the chunk
-  states none. "owner" is the person or organisation the claim is attributed to, or
-  null when the chunk states none. Prefer null over guessing.
+- "owner" is the person or organisation the claim is attributed to. When the chunk text
+  names no owner, use the author shown in the chunk header of the chunk you cite. Do
+  not return null when that header shows an author.
+- "claim_date" is the date the claim is about (YYYY-MM-DD). When the chunk text states
+  no date, use the date shown in the chunk header of the chunk you cite. Do not return
+  null when that header shows a date.
 - Skip opinions, questions and vague statements."""
 
 EXTRACTOR_SCHEMA_HINT = """{\
@@ -59,6 +71,13 @@ def extractor_user(question: str, chunks: List[Dict[str, Any]]) -> str:
         )
         lines.append(chunk["text"])
         lines.append("")
+
+    lines.append(
+        "Cover every chunk: return at least one claim that cites each of these "
+        "chunk ids ({}) unless that chunk states no checkable fact.".format(
+            ", ".join(str(chunk["chunk_id"]) for chunk in chunks)
+        )
+    )
     return "\n".join(lines)
 
 
