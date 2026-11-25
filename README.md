@@ -240,9 +240,8 @@ the [Sign-in](#sign-in) section. Every page except the sign-in screen needs that
   session that expires or a token that has been tampered with sends you back here with
   "Your session has ended. Sign in again."
 - **Dashboard.** Summary cards, the last five runs and quick actions. This is where sign-in
-  lands you. Stay on that one origin for the
-session (the backend also allows `127.0.0.1:5173`) so the remembered last-run link keeps
-working.
+  lands you. Stay on that one origin for the session (the backend also allows
+  `127.0.0.1:5173`) so the remembered last-run link keeps working.
 
 - **Run the demo.** On the Query view, click **Load demo**. This inserts four synthetic
   documents into an empty database, starts a run with the preset question, and opens the

@@ -594,3 +594,73 @@ claims/runs/evidence/conflicts/supersession tables, no frontend changes.
     change; the Phase 5b limitation is still disclosed in the README. Cut: no avatar, no
     settings page, no password change screen (the hash is edited through the script), and no
     multi-user support by design.
+
+## Phase 9 — Secret scan, fresh-clone retest and push
+
+1. **History secret scan.** The requested scan over every commit
+   (`git grep -n -i -E "gsk_|sk-[A-Za-z0-9]|AXIOM_PASSWORD_HASH=pbkdf2|AXIOM_SECRET=[A-Za-z0-9]"`
+   against `git rev-list --all`, plus one more grep for the development password, whose
+   literal is deliberately not repeated in this file) returned matches in three groups, none of them live
+   credentials: (a) `NOTES.md` and `README.md` prose that *describes* the variable names and
+   the old scan command; (b) placeholder values in `backend/.env.example` and the README
+   (`your_salt_hex`, `your_hash_hex`, `your_long_random_secret_here`); (c) the fixture string
+   `sk-should-not-leak` in `backend/tests/test_hardening.py`, which exists to prove that a
+   provider error body is not leaked into an API response — it is not a key. The regex also
+   matched `frontend/public/favicon.svg`, because the CSS property `mask-type:alpha` contains
+   the letters `sk-t`, which has nothing to do with credentials.
+   `git ls-files backend/.env` prints nothing, and no commit ever contained
+   a real `gsk_…` key, the development password or the development `AXIOM_SECRET`, so no
+   history rewrite was needed.
+
+2. **Stale remote.** `git fetch origin` showed local `main` one commit ahead (Phase 8,
+   `d0cf0b8`) and `origin/main` had no commits that local did not, so the push was a
+   fast-forward; no force-push.
+
+3. **Fresh-clone retest.** Cloned into `/tmp/axiom-fresh` and followed only the README, with
+   two deliberate local deviations, both outside the repository: a brand-new database
+   (`axiom_fresh` in the existing `axiom-db` container, created with `CREATE DATABASE`) so
+   `alembic upgrade head` was a real migration run instead of a no-op and the demo started
+   from an empty corpus; and the existing LLM key from the development `.env` copied into the
+   clone's `.env`, because there is no second provider key on this machine. The three
+   `AXIOM_*` values were new: username `freshowner`, a hash printed by
+   `python scripts/make_password_hash.py`, and a fresh `AXIOM_SECRET` from
+   `secrets.token_hex(32)`. Everything else followed the README as written:
+   `python3 -m venv .venv`, `pip install -r requirements.txt`, `cp .env.example .env`,
+   `alembic upgrade head`, `uvicorn app.main:app --host 127.0.0.1 --port 8000`,
+   `npm install`, `npm run dev`.
+
+4. **Fresh-clone results.** `GET /health` → `{"status":"ok","db":"ok"}` (200). Sign-in with the
+   new credentials → 200 with a token; a wrong password → 401 "Incorrect username or
+   password." Load demo → run #1 completed with 4 claims, the synthetic-data banner, three
+   supersession rows and one conflict row, all rendered in the report view. The Google Fonts
+   `<link>` fetched both `woff2` files from `fonts.gstatic.com` (200) and
+   `document.fonts.check()` reports both Inter and Space Grotesk loaded, with `body` computing
+   to `Inter, system-ui, …` and the heading to `"Space Grotesk", …` — so the page text is not
+   falling back to the system font.
+
+5. **README fix found by the retest (the only one).** The **Dashboard** bullet in *How to run*
+   had a two-line continuation that started at column 0, which ends the list item mid-sentence
+   and renders the rest as a stray indented paragraph. The sentence was rewrapped inside the
+   bullet. No other bullet, code block or table in the README had the same defect (checked by
+   scanning for unindented lines that follow an indented bullet continuation).
+
+6. **What was not verifiable here.** The shared preview panel in this session accepted
+   `preview_click` calls but the page never received the click: a real click at the centre of
+   the "Load the demo" button produced no request, while `elementFromPoint` at that point
+   returned the button itself and a `document…click()` from the page did. So the UI flow was
+   driven with real DOM clicks from inside the page (React handlers, fetch, router and the
+   backend all exercised) rather than with mouse input, and the sign-in/mouse-click path was
+   not re-proved by hand this phase. Phase 8's acceptance runs did click it by hand.
+
+7. **Cleanup.** The clone's `backend/.env` (which held the new secret and a copy of the LLM
+   key) was deleted together with the whole `/tmp/axiom-fresh` folder after the test, and the
+   throwaway `axiom_fresh` database was dropped, so the fresh secret exists nowhere.
+
+8. **The scan found one real problem: in this file.** The first version of item 1 quoted the
+   scan command verbatim, which wrote the development account's password into `NOTES.md`.
+   The string is not a provider key and the account is local-only, but it is still a password
+   and it briefly reached `origin/main` in the Phase 9 commit. It was removed from the file,
+   the commit was amended (`git commit --amend`) and the branch was updated with
+   `git push --force-with-lease`, so the published history contains no copy of it. This is the
+   only history rewrite in the project; nothing else was force-pushed. The lesson is recorded
+   here rather than quietly fixed: a scan command that contains a secret is itself a leak.
