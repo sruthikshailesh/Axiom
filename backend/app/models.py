@@ -26,6 +26,17 @@ class Base(DeclarativeBase):
     pass
 
 
+class AppUser(Base):
+    __tablename__ = "app_user"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    username: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
 class Source(Base):
     __tablename__ = "source"
 

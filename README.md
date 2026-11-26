@@ -76,8 +76,9 @@ Only features that are implemented and working are listed here.
   old and new claims both recorded.
 - **A report view with evidence**: per-claim status, notes, quote, source title, and the
   conflicts and supersessions the claim takes part in.
-- **Sign-in** with a single local account: a PBKDF2 password hash and an HMAC-signed token
-  that every API route except `/health` and `/auth/login` requires.
+- **Sign-in** with local accounts created on the sign-in screen (or the account in
+  `backend/.env`): PBKDF2 password hashes in Postgres and an HMAC-signed token that every
+  API route except `/health`, `/auth/login` and `/auth/register` requires.
 - **A dashboard**: counts of sources, runs and runs-with-a-conflict, the latest run's
   status, the last five runs with links to their reports, and quick actions.
 - **Search**: full-text search with a debounced query box, highlighted snippets, and a click
@@ -102,11 +103,12 @@ These are real, current limitations — not roadmap items presented as finished 
 - **Scanned PDFs are rejected.** Extraction uses `pypdf`, which reads a PDF's text layer.
   A scanned or image-only PDF has no text layer and is rejected with a 422 and an OCR hint.
   OCR is out of scope.
-- **Sign-in is a single local account, not production authentication.** One username and
-  one password hash live in `backend/.env`; there are no user accounts, no registration, no
-  password reset, no roles, no per-user data separation and no rate limiting on login. Every
-  signed-in request sees the same data. CORS is limited to the two loopback frontend
-  origins. Do not expose this deployment to the internet as-is.
+- **Sign-in is local accounts, not production authentication.** Accounts are rows in the
+  local `app_user` table, created from the sign-in screen; the single account in
+  `backend/.env` remains as a fallback. There is no password reset, no email verification,
+  no roles and no per-user data separation, and only registration is rate-limited — login
+  is not. Every signed-in request sees the same data. CORS is limited to the two loopback
+  frontend origins. Do not expose this deployment to the internet as-is.
 - **Results depend on the LLM provider's output.** Claim wording, how many claims are
   extracted, and therefore which conflicts and supersessions are found, vary between
   models and between runs of the same model. The verifier's rules are deterministic, but
@@ -263,9 +265,28 @@ the database volume as well).
 
 ## Sign-in
 
-AXIOM has **one local account**, meant for one person on one machine. It is not production
-authentication: there is no registration, no user management and no per-user data
-separation.
+AXIOM signs in with **local accounts** meant for one machine: one account may come from
+`backend/.env` as a fallback, and further accounts are created on the sign-in screen. This
+is not production authentication: there is no user management, no password reset and no
+per-user data separation.
+
+### Create an account
+
+On the sign-in screen choose **Create account**, enter a username and the same password
+twice, and submit. A username is 3–32 characters — letters, digits, `.`, `_` or `-` — and is
+stored in lowercase; the password must be at least 8 characters. The account is a row in
+the local `app_user` table in Postgres, and only a PBKDF2-SHA256 hash of the password is
+written; the password itself is never stored or logged. After it is created you return to
+**Sign in** and use it there.
+
+A username that already exists answers "That username is already taken." A rule that fails
+says which rule it was, and more than 10 attempts from one address within a minute answer
+"Too many attempts. Try again in a minute." The account in `backend/.env` keeps working, so
+you cannot be locked out.
+
+These accounts live in this machine's database. This is not production authentication: no
+password reset, no email verification, no roles, and every signed-in user sees the same
+data.
 
 ### Create the password hash
 

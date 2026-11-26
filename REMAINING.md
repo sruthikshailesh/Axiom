@@ -23,9 +23,9 @@ Freeze time: **9:00 PM on 26 November**.
 ## Sign-in
 
 - [ ] **Local password — open (unchanged since it was shown in chat).** Verified in this
-      run: `verify_password('axiom-local-2026', settings.axiom_password_hash)` returned
-      `True`, so the value in `backend/.env` still matches the one that appeared in the
-      earlier notes. It has not been rotated. Rotate it with
+      run: verifying the local password from chat against `settings.axiom_password_hash`
+      returned `True`, so the value in `backend/.env` still matches the one that appeared
+      in the earlier notes. It has not been rotated. Rotate it with
       `python scripts/make_password_hash.py` and a new `AXIOM_SECRET` if the exposure is a
       concern; doing so signs out every existing session.
 - [x] **Google sign-in — skipped.** `GOOGLE_CLIENT_ID` is not set in `backend/.env`, so

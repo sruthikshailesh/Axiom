@@ -131,6 +131,30 @@ def issue_token(username: str) -> str:
     return "{}.{}".format(encoded, _sign(encoded, secret))
 
 
+def account_exists(username: str) -> bool:
+    """True for the `.env` account or a username registered in the database."""
+    if not username:
+        return False
+    if settings.axiom_username and username == settings.axiom_username:
+        return True
+
+    # Imported here so this module stays importable without the database.
+    from sqlalchemy import text
+    from sqlalchemy.exc import SQLAlchemyError
+
+    from app.db import engine
+
+    try:
+        with engine.connect() as connection:
+            row = connection.execute(
+                text("SELECT 1 FROM app_user WHERE username = :username"),
+                {"username": username},
+            ).first()
+    except SQLAlchemyError:
+        return False
+    return row is not None
+
+
 def read_token(token: str) -> str:
     """Return the username in a valid token, or raise AuthError."""
     secret = _secret()
@@ -170,8 +194,8 @@ def read_token(token: str) -> str:
     if expires_at <= int(time.time()):
         raise AuthError("Token has expired.")
 
-    # One local account: a token for any other name is not usable here.
-    if username != settings.axiom_username:
+    # A token for an account that no longer exists is not usable here.
+    if not account_exists(username):
         raise AuthError("Token is not valid for this account.")
 
     return username

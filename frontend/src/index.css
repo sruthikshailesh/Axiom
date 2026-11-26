@@ -1208,19 +1208,42 @@ mark {
   box-shadow: var(--shadow);
 }
 
-.auth-card-title {
-  margin: 0;
-  font-size: 20px;
+.auth-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 0 0 22px;
+}
+
+.auth-tab {
+  padding: 0 0 7px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 16px;
   font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-tab:hover:not(:disabled) {
   color: var(--text);
 }
 
-.auth-card-underline {
-  display: block;
-  width: 34px;
-  height: 2px;
-  margin: 10px 0 22px;
-  background-color: var(--accent);
+.auth-tab:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.auth-tab[aria-selected='true'] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.auth-tab:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .auth-form {
@@ -1347,6 +1370,16 @@ mark {
   border-radius: var(--radius);
   background-color: rgba(224, 102, 102, 0.08);
   color: #ffd9d9;
+  font-size: 14px;
+}
+
+.auth-notice {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius);
+  background-color: var(--accent-soft);
+  color: var(--text);
   font-size: 14px;
 }
 

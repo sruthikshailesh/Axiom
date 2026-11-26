@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { errorMessage, login } from '../api'
+import { errorMessage, login, register } from '../api'
 import { getToken, setToken } from '../session'
 
 const WORKFLOW = ['UPLOAD', 'RESEARCH', 'EXTRACT', 'VERIFY', 'REPORT']
+
+type Mode = 'signin' | 'create'
 
 const GLYPHS = '{}[]/\\<>0123456789#|—·'.split('')
 
@@ -240,10 +242,13 @@ function SignInView() {
   const stateMessage =
     (location.state as { message?: string } | null)?.message ?? null
 
+  const [mode, setMode] = useState<Mode>('signin')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [revealPassword, setRevealPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [still, setStill] = useState(false)
 
@@ -257,13 +262,41 @@ function SignInView() {
 
   if (getToken()) return <Navigate to="/dashboard" replace />
 
+  function switchMode(next: Mode) {
+    if (busy || next === mode) return
+    setMode(next)
+    setError(null)
+    setNotice(null)
+    setPassword('')
+    setConfirm('')
+  }
+
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault()
     if (busy) return
 
+    // The two passwords are compared here so a typo never reaches the backend.
+    if (mode === 'create' && password !== confirm) {
+      setNotice(null)
+      setError('Passwords do not match.')
+      return
+    }
+
     setBusy(true)
     setError(null)
+    setNotice(null)
     try {
+      if (mode === 'create') {
+        const created = await register(username.trim(), password)
+        setMode('signin')
+        setUsername(created.username)
+        setPassword('')
+        setConfirm('')
+        setNotice('Account created. Sign in to continue.')
+        setBusy(false)
+        return
+      }
+
       const session = await login(username.trim(), password)
       setToken(session.token)
       navigate('/dashboard', { replace: true })
@@ -274,6 +307,11 @@ function SignInView() {
   }
 
   const message = error ?? stateMessage
+  const canSubmit =
+    !busy &&
+    Boolean(username.trim()) &&
+    Boolean(password) &&
+    (mode === 'signin' || Boolean(confirm))
 
   return (
     <div className="auth-page">
@@ -333,10 +371,40 @@ function SignInView() {
 
       <section className="auth-right">
         <div className="auth-card">
-          <h2 className="auth-card-title">Sign in</h2>
-          <span className="auth-card-underline" aria-hidden="true" />
+          <div className="auth-tabs" role="tablist" aria-label="Account">
+            <button
+              id="auth-tab-signin"
+              className="auth-tab"
+              type="button"
+              role="tab"
+              aria-selected={mode === 'signin'}
+              aria-controls="auth-panel"
+              onClick={() => switchMode('signin')}
+              disabled={busy}
+            >
+              Sign in
+            </button>
+            <button
+              id="auth-tab-create"
+              className="auth-tab"
+              type="button"
+              role="tab"
+              aria-selected={mode === 'create'}
+              aria-controls="auth-panel"
+              onClick={() => switchMode('create')}
+              disabled={busy}
+            >
+              Create account
+            </button>
+          </div>
 
-          <form className="auth-form" onSubmit={onSubmit}>
+          <form
+            id="auth-panel"
+            className="auth-form"
+            role="tabpanel"
+            aria-labelledby={mode === 'create' ? 'auth-tab-create' : 'auth-tab-signin'}
+            onSubmit={onSubmit}
+          >
             <div className="auth-field">
               <label className="auth-label" htmlFor="auth-username">
                 Username
@@ -363,8 +431,8 @@ function SignInView() {
                   id="auth-password"
                   className="auth-input"
                   type={revealPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  placeholder="Your password"
+                  autoComplete={mode === 'create' ? 'new-password' : 'current-password'}
+                  placeholder={mode === 'create' ? 'At least 8 characters' : 'Your password'}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   disabled={busy}
@@ -382,12 +450,33 @@ function SignInView() {
               </div>
             </div>
 
-            <button
-              className="auth-submit"
-              type="submit"
-              disabled={busy || !username.trim() || !password}
-            >
-              {busy ? 'Signing in…' : 'Sign in'}
+            {mode === 'create' ? (
+              <div className="auth-field">
+                <label className="auth-label" htmlFor="auth-confirm">
+                  Confirm password
+                </label>
+                <input
+                  id="auth-confirm"
+                  className="auth-input"
+                  type={revealPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  placeholder="Repeat your password"
+                  value={confirm}
+                  onChange={(event) => setConfirm(event.target.value)}
+                  disabled={busy}
+                  required
+                />
+              </div>
+            ) : null}
+
+            <button className="auth-submit" type="submit" disabled={!canSubmit}>
+              {mode === 'create'
+                ? busy
+                  ? 'Creating account…'
+                  : 'Create account'
+                : busy
+                  ? 'Signing in…'
+                  : 'Sign in'}
             </button>
           </form>
 
@@ -397,7 +486,15 @@ function SignInView() {
             </p>
           ) : null}
 
-          <p className="auth-card-foot">One local account. Not production authentication.</p>
+          {notice ? (
+            <p className="auth-notice" role="status">
+              {notice}
+            </p>
+          ) : null}
+
+          <p className="auth-card-foot">
+            Accounts are stored locally. Not production authentication.
+          </p>
         </div>
       </section>
     </div>

@@ -172,6 +172,18 @@ export function login(username: string, password: string): Promise<LoginResponse
   })
 }
 
+export function register(
+  username: string,
+  password: string,
+): Promise<{ username: string }> {
+  return request<{ username: string }>('/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+    skipAuthRedirect: true,
+  })
+}
+
 export function currentUser(): Promise<{ username: string }> {
   return request<{ username: string }>('/auth/me')
 }

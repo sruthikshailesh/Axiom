@@ -64,7 +64,7 @@ def database() -> Iterator[None]:
         connection.execute(
             text(
                 "TRUNCATE chunk, source, run, claim, evidence, conflict, "
-                "supersession RESTART IDENTITY CASCADE"
+                "supersession, app_user RESTART IDENTITY CASCADE"
             )
         )
     engine.dispose()
