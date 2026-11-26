@@ -59,6 +59,22 @@ AXIOM replaces the summarised answer with an evidence-backed claim graph:
 A quote that cannot be found in its cited chunk is dropped, so the report cannot contain a
 claim whose evidence does not exist in the corpus.
 
+## Live demo
+
+| | URL |
+| --- | --- |
+| Frontend | LIVE_FRONTEND_URL |
+| API | LIVE_API_URL |
+
+- The API answers `GET LIVE_API_URL/health` with `{"status":"ok","db":"ok"}`; that route
+  needs no sign-in.
+- **The free Render backend sleeps when idle.** After a pause, the first request can take
+  about 60 seconds while the service starts. Load `/health` (or the frontend) and wait for
+  it to answer before signing in; a slow first load is the service waking up, not an error.
+- The live site uses only the **synthetic demo data** and **one local account**. It is a
+  demo of the real pipeline, not a private workspace: anyone with the account sees the same
+  documents and runs, and the database can be reset between demos.
+
 ## Key features
 
 Only features that are implemented and working are listed here.
@@ -107,8 +123,9 @@ These are real, current limitations — not roadmap items presented as finished 
   local `app_user` table, created from the sign-in screen; the single account in
   `backend/.env` remains as a fallback. There is no password reset, no email verification,
   no roles and no per-user data separation, and only registration is rate-limited — login
-  is not. Every signed-in request sees the same data. CORS is limited to the two loopback
-  frontend origins. Do not expose this deployment to the internet as-is.
+  is not. Every signed-in request sees the same data. CORS is limited to the origins in
+  `CORS_ORIGINS` (the two loopback origins by default). Do not expose this deployment to
+  the internet as-is.
 - **Results depend on the LLM provider's output.** Claim wording, how many claims are
   extracted, and therefore which conflicts and supersessions are found, vary between
   models and between runs of the same model. The verifier's rules are deterministic, but
@@ -262,6 +279,59 @@ the [Sign-in](#sign-in) section. Every page except the sign-in screen needs that
 
 To stop, press `Ctrl+C` in both terminals and run `docker compose down` (add `-v` to drop
 the database volume as well).
+
+## Deployment
+
+The app deploys as two managed services and needs no code change to do it: **Render** runs
+the API and a managed PostgreSQL database, **Vercel** serves the built frontend. The only
+things to configure are environment variables, listed here by name only.
+
+### 1. Render — PostgreSQL
+
+Create a Render **Postgres** instance (any paid or free plan) in the same region as the web
+service. When it is ready, open it and copy its **Internal Database URL**. That value is
+`DATABASE_URL` for the web service. The API accepts it in Render's form (`postgres://…` or
+`postgresql://…`) and rewrites it to the psycopg 3 driver itself, so no editing is needed.
+
+### 2. Render — web service
+
+- **New → Web Service**, pick this repository, and set **Root Directory** to `backend`.
+- **Runtime: Docker.** Render builds `backend/Dockerfile`, which installs
+  `backend/requirements.txt` only (Python 3.11), copies `app/`, `alembic/` and `demo/`, runs
+  `alembic upgrade head`, then starts `uvicorn app.main:app` on Render's `$PORT`.
+- **Health check path:** `/health`.
+- **Environment variables** (names only — set the values in the Render dashboard):
+
+| Variable | Where the value comes from |
+| --- | --- |
+| `DATABASE_URL` | The Render Postgres instance's Internal Database URL. |
+| `CORS_ORIGINS` | Comma-separated frontend origins, e.g. the Vercel URL. No wildcard, no trailing slash. |
+| `AXIOM_USERNAME` | The single demo account's username. |
+| `AXIOM_PASSWORD_HASH` | Generated locally with `python scripts/make_password_hash.py` (see [Sign-in](#sign-in)). |
+| `AXIOM_SECRET` | A long random string; changing it signs everyone out. |
+| `AXIOM_TOKEN_HOURS` | Optional; session lifetime in hours. |
+| `LLM_PROVIDER` | `openai` (the only implementation). |
+| `LLM_API_KEY` | The LLM provider key. Never commit it. |
+| `LLM_MODEL` | Model name as the provider expects it. |
+| `LLM_BASE_URL` | Optional OpenAI-compatible endpoint. |
+
+Sign-in answers 503 until the three `AXIOM_*` sign-in variables are all set, and every run
+fails with a readable message until `LLM_API_KEY` is set. `/health` needs only
+`DATABASE_URL`.
+
+### 3. Vercel — frontend
+
+- **Add New → Project**, import this repository, and set **Root Directory** to `frontend`.
+  Vercel detects Vite: build `npm run build`, output `dist`.
+- **Environment variable:** `VITE_API_URL` = the Render web service URL (no trailing
+  slash). Vite inlines it at build time, so redeploy after changing it; when it is unset the
+  frontend falls back to `http://localhost:8000`.
+- `frontend/vercel.json` rewrites every path to `/index.html`, so `/dashboard`, `/runs/12`
+  and `/sign-in` load directly on a refresh instead of 404ing.
+
+After both are live, put the two URLs in the [Live demo](#live-demo) table. A cheap smoke
+test: `LIVE_API_URL/health`, then sign in on `LIVE_FRONTEND_URL`, run the demo, and reload
+`/runs/<id>` to check the rewrite.
 
 ## Screenshots
 

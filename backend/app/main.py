@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.config import settings
 from app.db import SessionLocal, engine
 from app.pipeline.run_state import sweep_interrupted_runs
 from app.routes import auth as auth_routes
@@ -42,10 +43,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AXIOM", version="0.8.0", lifespan=lifespan)
 
-# Explicit loopback origins only: never a wildcard.
+# Explicit origins from CORS_ORIGINS (two loopback origins by default): never a wildcard.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["Authorization", "Content-Type"],
