@@ -164,7 +164,7 @@ function Shell() {
   }
 
   const latestRunId = summary?.latest_run?.id ?? null
-  const recents = summary?.recent_runs.slice(0, 5) ?? []
+  const recents = summary?.recent_runs.slice(0, 3) ?? []
   const currentPath = location.pathname
 
   return (
@@ -330,13 +330,6 @@ function Shell() {
           </div>
 
           <div className="side-foot">
-            <Link className="nav-link foot-guide" to="/guide" title="Guide">
-              <span className="nav-icon">
-                <BookIcon />
-              </span>
-              <span className="side-label">Guide</span>
-            </Link>
-
             <div className="user-wrap" ref={userMenuRef}>
               {userMenuOpen ? (
                 <div className="user-menu" role="menu">

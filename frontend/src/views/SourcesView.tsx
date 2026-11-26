@@ -8,7 +8,9 @@ import {
   type Chunk,
   type SourceSummary,
 } from '../api'
+import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
+import SkeletonRows from '../components/Skeleton'
 
 function formatDate(value: string): string {
   const parsed = new Date(value)
@@ -161,6 +163,7 @@ function SourcesView() {
             <span className="field-label">File (.txt, .md, .pdf)</span>
             <input
               className="input"
+              id="source-file"
               type="file"
               accept=".txt,.md,.pdf"
               ref={fileInput}
@@ -226,7 +229,7 @@ function SourcesView() {
           </button>
         </div>
 
-        {loadingList && sources === null ? <p className="muted">Loading sources…</p> : null}
+        {loadingList && sources === null ? <SkeletonRows count={3} /> : null}
         {listError ? (
           <div className="alert alert-error" role="alert">
             {listError}
@@ -234,7 +237,14 @@ function SourcesView() {
         ) : null}
 
         {sources && sources.length === 0 && !listError ? (
-          <p className="empty">No sources yet. Upload a document to get started.</p>
+          <EmptyState
+            title="No sources yet."
+            body="Upload a document to get started."
+            action={{
+              label: 'Choose a file',
+              onClick: () => document.getElementById('source-file')?.focus(),
+            }}
+          />
         ) : null}
 
         {sources && sources.length > 0 ? (
@@ -278,9 +288,14 @@ function SourcesView() {
                           {chunkErrors[source.id]}
                         </div>
                       ) : chunks && chunks.length === 0 ? (
-                        <p className="empty">
-                          This source has no chunks. Upload a different file.
-                        </p>
+                        <EmptyState
+                          title="This source has no chunks."
+                          body="Upload a different file."
+                          action={{
+                            label: 'Upload another file',
+                            onClick: () => document.getElementById('source-file')?.focus(),
+                          }}
+                        />
                       ) : (
                         chunks?.map((chunk) => (
                           <div className="chunk" id={`chunk-${chunk.id}`} key={chunk.id}>

@@ -132,7 +132,7 @@ These are real, current limitations — not roadmap items presented as finished 
 | Migrations | Alembic |
 | LLM | Any OpenAI-compatible chat completions API |
 | Auth | Standard-library PBKDF2 password hashing and HMAC-SHA256 signed tokens |
-| Typography | Space Grotesk (headings) and Inter (body), loaded from Google Fonts |
+| Typography | Space Grotesk (headings, 400–700) and Inter (body, 400–700), loaded from Google Fonts |
 | Infra | Docker Compose (database only) |
 
 ## Installation and setup
@@ -262,6 +262,52 @@ the [Sign-in](#sign-in) section. Every page except the sign-in screen needs that
 
 To stop, press `Ctrl+C` in both terminals and run `docker compose down` (add `-v` to drop
 the database volume as well).
+
+## Screenshots
+
+All screenshots are 1440 px wide (the two mobile ones are 390 px) and were taken
+of the running app.
+
+![Sign-in screen](docs/screenshots/sign-in.png)
+
+*Sign-in: the local-account card beside the AXIOM masthead.*
+
+![Overview](docs/screenshots/overview.png)
+
+*Overview: summary counts, items that need attention, claim statuses and recent runs.*
+
+![Ask](docs/screenshots/ask.png)
+
+*Ask: one question box, with the synthetic demo loader beside it.*
+
+![Demo report](docs/screenshots/report-demo.png)
+
+*Report for the synthetic demo run: honesty banner, pipeline steps, and a claim with its
+quote and source open.*
+
+![Failed report](docs/screenshots/report-failed.png)
+
+*A failed run states what went wrong and links back to Ask.*
+
+![Sources](docs/screenshots/sources.png)
+
+*Sources: the upload form and the source library.*
+
+![Search](docs/screenshots/search.png)
+
+*Search: full-text results with the matched term highlighted.*
+
+![Guide](docs/screenshots/guide.png)
+
+*Guide: the pipeline, the accepted file types and what each status means.*
+
+![Overview at 390 px](docs/screenshots/overview-390.png)
+
+*Overview at 390 px: the sidebar becomes a top bar and the stat cards stack.*
+
+![Report at 390 px](docs/screenshots/report-390.png)
+
+*The same report at 390 px, with no horizontal page scroll.*
 
 ## Sign-in
 

@@ -12,6 +12,8 @@ import {
   type SourceSummary,
 } from '../api'
 import { rememberRun } from '../lastRun'
+import EmptyState from '../components/EmptyState'
+import SkeletonRows from '../components/Skeleton'
 import StatusBadge from '../components/StatusBadge'
 
 const STATUS_ORDER = ['verified', 'conflict', 'uncertain', 'superseded'] as const
@@ -202,17 +204,29 @@ function DashboardView() {
       <section className="stat-grid" aria-label="Summary">
         <div className="card stat">
           <p className="stat-label">Sources</p>
-          <p className="stat-value">{summary ? summary.sources : '—'}</p>
+          {summary ? (
+            <p className="stat-value">{summary.sources}</p>
+          ) : (
+            <span className="skeleton stat-skeleton" aria-hidden="true" />
+          )}
           <p className="stat-note">Documents indexed</p>
         </div>
         <div className="card stat">
           <p className="stat-label">Runs</p>
-          <p className="stat-value">{summary ? summary.runs : '—'}</p>
+          {summary ? (
+            <p className="stat-value">{summary.runs}</p>
+          ) : (
+            <span className="skeleton stat-skeleton" aria-hidden="true" />
+          )}
           <p className="stat-note">Questions asked</p>
         </div>
         <div className="card stat">
           <p className="stat-label">Runs with a conflict</p>
-          <p className="stat-value">{summary ? summary.runs_with_conflict : '—'}</p>
+          {summary ? (
+            <p className="stat-value">{summary.runs_with_conflict}</p>
+          ) : (
+            <span className="skeleton stat-skeleton" aria-hidden="true" />
+          )}
           <p className="stat-note">Two documents disagree</p>
         </div>
         <div className="card stat">
@@ -241,7 +255,11 @@ function DashboardView() {
           </div>
 
           {attention.length === 0 ? (
-            <p className="empty">Nothing needs attention right now.</p>
+            <EmptyState
+              title="Nothing needs attention right now."
+              body="Conflicts, failed runs and empty sources appear here when there are any."
+              action={{ label: 'Ask a question', to: '/ask' }}
+            />
           ) : (
             <ul className="attention-list">
               {attention.map((item) => (
@@ -266,7 +284,11 @@ function DashboardView() {
           </div>
 
           {claimTotal === 0 ? (
-            <p className="empty">No claims yet.</p>
+            <EmptyState
+              title="No claims yet."
+              body="Claim statuses appear once a run has extracted its first claims."
+              action={{ label: 'Run a question', to: '/ask' }}
+            />
           ) : (
             <ul className="claim-counts">
               {STATUS_ORDER.map((status) => {
@@ -299,12 +321,14 @@ function DashboardView() {
           <span className="muted small">Last {summary?.recent_runs.length ?? 0}</span>
         </div>
 
-        {summary === null && !error ? <p className="muted">Loading runs…</p> : null}
+        {summary === null && !error ? <SkeletonRows count={4} /> : null}
 
         {summary && summary.recent_runs.length === 0 ? (
-          <p className="empty">
-            No runs yet. Ask a question, or load the demo to see a full report.
-          </p>
+          <EmptyState
+            title="No runs yet."
+            body="Ask a question, or load the demo to see a full report."
+            action={{ label: 'Ask a question', to: '/ask' }}
+          />
         ) : null}
 
         {summary && summary.recent_runs.length > 0 ? (

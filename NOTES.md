@@ -919,3 +919,78 @@ claims/runs/evidence/conflicts/supersession tables, no frontend changes.
    against its cards, and links moved to a lighter dusty purple to clear 4.5:1.
 
 6. **Commit.** Local commit "AXIOM app shell redesign"; not pushed.
+
+## Phase 13 — Typography and UI polish
+
+1. **Diagnosis before edits.** Measured in the running app at 1440 px. The heading family
+   loaded only at 500–700, so `document.fonts.check('16px "Space Grotesk"')` returned
+   false; Inter had no 700, so `<strong>` was synthesised. Body line-height was 1.55
+   (24.8 px at 16 px) instead of 1.6. The page eyebrow used 0.18em tracking at weight 400,
+   the h1 carried +0.01em instead of a tight heading value, and `.badge` text colours
+   measured 4.20–4.21:1 on their own tints. The page background was #111318 and the card
+   #1a1d24 (1.07:1), so a card was only visible because of its border. One browser-default
+   element (`.nav-backdrop`, font 13.3 px Arial) fell outside the type system.
+
+2. **Font weights (documented in the README).** `frontend/index.html` now requests
+   Inter 400;500;600;700 and Space Grotesk 400;500;600;700. No family was added or
+   removed. The 400 heading face and the 700 body face are the only change; both now
+   report loaded in `document.fonts.check()`.
+
+3. **Tokens.** `src/index.css` defines `--font-heading`, `--font-body`, `--font-mono`,
+   the six sizes (`--text-xs` … `--text-2xl`), the four weights, three line heights and
+   two tracking values. Every `font-size` and `font-weight` declaration in the stylesheet
+   uses a token; a grep for raw `font-size: <number>` and `font-weight: <number>` returns
+   nothing. `button, input, select, textarea { font: inherit }` removes the last
+   browser-default font.
+
+4. **Palette change justified by measurement.** The card surface moved from #1a1d24 to
+   #232833 so a card reads as a surface without its border (1.26:1 against #111318), with
+   one shadow token that includes `inset 0 1px 0 rgba(255,255,255,0.04)`. `--surface-2`
+   became #191d25 and `--border` #333a47. Because a lighter card lowers badge contrast,
+   the conflict text moved from #e06666 to #ec8b8b and superseded from #8b919c to #a9b0bb.
+   The four status hues are unchanged; only their lightness was tuned to clear 4.5:1 on
+   the tinted badge backgrounds.
+
+5. **Role mapping.** h1 = 40 px Space Grotesk 600/1.15/-0.01em; card title = 20 px 600/1.15;
+   eyebrow = 12 px Inter 500 uppercase +0.08em in `--accent-text`; body = 16 px/1.6;
+   meta = 14 px muted; stat numbers = 28 px 600 tabular; table cells = 14 px tabular;
+   buttons = 14 px 500; quotes = 14 px mono in a bordered block with a 3 px accent bar.
+   Run status and claim badges gained a `::before` dot so colour is never the only cue.
+
+6. **Spacing and states.** Section gaps 24 px, card padding 20 px (24 px on the command
+   card), 16 px between form fields. One hover lift colour (#2b3140) and one row hover
+   surface; table rows, claims, sources and attention rows have hover backgrounds. All
+   focus rings are 2 px accent at 2 px offset, including a global `:focus-visible`
+   fallback and a ring on the top-bar search box (the input itself is borderless). The
+   disabled primary button is 40% opacity with `cursor: not-allowed`.
+
+7. **Empty states and loading.** `components/EmptyState.tsx` is now the only empty state:
+   heading, one sentence and a next-step button or link, used on Overview (attention,
+   claim statuses, recent runs), Report (claims, supersessions, conflicts), Sources (empty
+   library, a source with no chunks) and Search (no query, no matches).
+   `components/Skeleton.tsx` replaces the bare "Loading…" text on the Overview stat cards
+   and recent-runs table, the Report and the Sources library; its shimmer is removed under
+   `prefers-reduced-motion`.
+
+8. **Deliberate small UI changes.** The active nav item already had a left accent bar plus
+   a lighter background, so it was left as is. The duplicate Guide link in the sidebar
+   footer was removed (Guide remains in the nav); the footer overlapped the Recents list
+   at 900 px once the type grew. Recents now shows the three most recent runs and clips
+   instead of spilling. The native file picker is themed with `::file-selector-button`.
+   Paragraphs are capped at 76ch inside cards, and page h1s drop to 28 px below 900 px so
+   a long report question does not fill a phone screen.
+
+9. **Screenshots.** Ten captures in `docs/screenshots/` at 1×: eight at 1440×900 and two
+   at 390×796. They were captured through the browser preview at a 1440×900 viewport and
+   resampled to 1440 px wide with `sips`; the three text-dense frames that still exceeded
+   300 KB were re-encoded as 256-colour PNGs with a throwaway Python script (no package
+   added). The small purple "Freebuff" pill at the top-left of the desktop captures is
+   injected by the preview tool, not by AXIOM; it is not part of the app and could not be
+   removed from the screenshot.
+
+10. **Verified in the browser.** All pages: only 12/14/16/20/28/40 px and only
+    400/500/600/700; no element resolves to a fallback font; the lowest body-text contrast
+    is 4.79:1 (the primary button's #141220 on #8b7aa8); scrollWidth equals 390 at every
+    screen; one h1 per page; the demo banner text is unchanged; no console errors. Not
+    verified: hover and focus states were confirmed from the stylesheet and computed
+    outlines, not by driving every control with a mouse and keyboard.

@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { errorMessage, getRun, type Claim, type RunDetail } from '../api'
+import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
+import StatusBadge from '../components/StatusBadge'
+import { Skeleton } from '../components/Skeleton'
 
 const ACTIVE_STATUSES = ['queued', 'researching', 'extracting', 'verifying']
 const STEPS = ['researching', 'extracting', 'verifying', 'done']
@@ -9,10 +12,6 @@ const STEPS = ['researching', 'extracting', 'verifying', 'done']
 function currentStep(status: string): number {
   if (status === 'completed') return 3
   return STEPS.indexOf(status) // -1 while queued
-}
-
-function StatusBadge({ status }: { status: Claim['status'] }) {
-  return <span className={`badge badge-${status}`}>{status}</span>
 }
 
 function formatWhen(value: string | null): string {
@@ -130,6 +129,16 @@ function ReportView() {
     return (
       <div className="report">
         <PageHeader eyebrow="Report" title="Loading run…" description="Fetching the report." />
+        <section className="card" role="status" aria-label="Loading report">
+          <Skeleton width="30%" />
+          <div className="skeleton-stack">
+            <Skeleton width="92%" />
+            <Skeleton width="86%" />
+            <Skeleton width="72%" />
+            <Skeleton width="88%" />
+            <Skeleton width="54%" />
+          </div>
+        </section>
       </div>
     )
   }
@@ -232,11 +241,11 @@ function ReportView() {
           <section className="card">
             <h2 className="card-title">Claims ({run.claims.length})</h2>
             {run.claims.length === 0 ? (
-              <p className="empty">
-                No claims were extracted for this question.
-                <span className="muted"> “{run.question}”</span> Try a broader question, and
-                check the Sources page that your documents were uploaded.
-              </p>
+              <EmptyState
+                title="No claims were extracted for this question."
+                body="Try a broader question, and check on the Sources page that your documents were uploaded."
+                action={{ label: 'Open sources', to: '/sources' }}
+              />
             ) : (
               <ul className="claims">
                 {run.claims.map((claim) => (
@@ -249,10 +258,11 @@ function ReportView() {
           <section className="card">
             <h2 className="card-title">Supersessions ({run.supersessions.length})</h2>
             {run.supersessions.length === 0 ? (
-              <p className="empty">
-                No claim supersedes another in this run. Read the claims above; nothing needs
-                resolving here.
-              </p>
+              <EmptyState
+                title="No claim supersedes another in this run."
+                body="Nothing needs resolving here."
+                action={{ label: 'Read the claims', onClick: () => window.scrollTo({ top: 0 }) }}
+              />
             ) : (
               run.supersessions.map((supersession) => (
                 <div className="pair" key={`${supersession.old_claim_id}-${supersession.new_claim_id}`}>
@@ -273,10 +283,11 @@ function ReportView() {
           <section className="card">
             <h2 className="card-title">Conflicts ({run.conflicts.length})</h2>
             {run.conflicts.length === 0 ? (
-              <p className="empty">
-                No conflicting claims in this run. Read the claims above; nothing needs
-                resolving here.
-              </p>
+              <EmptyState
+                title="No conflicting claims in this run."
+                body="Nothing needs resolving here."
+                action={{ label: 'Read the claims', onClick: () => window.scrollTo({ top: 0 }) }}
+              />
             ) : (
               run.conflicts.map((conflict) => (
                 <div className="pair" key={`${conflict.claim_a_id}-${conflict.claim_b_id}`}>

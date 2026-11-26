@@ -7,6 +7,7 @@ import {
   type SearchHit,
   type SourceSummary,
 } from '../api'
+import EmptyState from '../components/EmptyState'
 import PageHeader from '../components/PageHeader'
 
 const DEBOUNCE_MS = 300
@@ -183,17 +184,24 @@ function SearchView() {
 
       {!term ? (
         <section className="card">
-          <p className="empty">
-            Type a word or phrase to search. Results are ranked by PostgreSQL full-text
-            search.
-          </p>
+          <EmptyState
+            title="Type a word or phrase to search."
+            body="Results are ranked by PostgreSQL full-text search."
+            action={{
+              label: 'Focus the search box',
+              onClick: () => document.getElementById('search-query')?.focus(),
+            }}
+          />
         </section>
       ) : null}
 
       {term && !loading && hits !== null && hits.length === 0 ? (
         <section className="card">
-          <p className="empty">No passages match that search.</p>
-          <p className="muted small">Try a different word or phrase.</p>
+          <EmptyState
+            title="No passages match that search."
+            body="Try a different word or phrase."
+            action={{ label: 'Clear the search', onClick: () => setQuery('') }}
+          />
         </section>
       ) : null}
 
