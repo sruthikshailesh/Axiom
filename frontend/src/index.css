@@ -104,7 +104,7 @@ code {
 
 .sidebar-mark {
   font-family: var(--font-head);
-  font-size: 13px;
+  font-size: 12px;
   letter-spacing: 0.42em;
   color: var(--muted);
   padding-left: 10px;
@@ -130,7 +130,7 @@ code {
   color: var(--muted);
   text-decoration: none;
   font: inherit;
-  font-size: 15px;
+  font-size: 16px;
   text-align: left;
   cursor: pointer;
 }
@@ -170,7 +170,7 @@ code {
 .sidebar-user {
   margin: 0;
   padding-left: 12px;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--gold);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -261,7 +261,7 @@ h3.panel-title {
 }
 
 .small {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .empty {
@@ -281,7 +281,6 @@ h3.panel-title {
 .link:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 /* Forms ------------------------------------------------------------------- */
@@ -295,7 +294,7 @@ h3.panel-title {
 }
 
 .field-label {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -446,7 +445,7 @@ h3.panel-title {
   border-radius: 999px;
   border: 1px solid var(--border);
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   text-transform: capitalize;
 }
 
@@ -527,7 +526,11 @@ h3.panel-title {
 .source-head:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: var(--radius);
+}
+
+.claim-head:hover,
+.source-head:hover {
+  color: var(--text);
 }
 
 .claim-toggle {
@@ -759,7 +762,6 @@ h3.panel-title {
 .run-question:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 .run-side {
@@ -886,7 +888,7 @@ mark {
 }
 
 .guide-list li {
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .status-list {
@@ -974,7 +976,7 @@ mark {
   flex: none;
   min-width: 34px;
   color: var(--accent);
-  font-size: 13px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1053,7 +1055,7 @@ mark {
 
 .auth-brand-sub {
   margin: 9px 0 0;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--muted);
@@ -1065,7 +1067,7 @@ mark {
 
 .auth-headline {
   margin: 0;
-  font-size: clamp(27px, 3.2vw, 44px);
+  font-size: clamp(28px, 3.2vw, 40px);
   line-height: 1.16;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -1078,7 +1080,7 @@ mark {
 
 .auth-subline {
   margin: 16px 0 0;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--muted);
 }
 
@@ -1107,7 +1109,7 @@ mark {
 }
 
 .auth-flow-label {
-  font-size: 10.5px;
+  font-size: 12px;
   letter-spacing: 0.22em;
   color: var(--muted);
 }
@@ -1149,7 +1151,7 @@ mark {
   gap: 7px;
   flex: none;
   color: var(--conflict);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.22em;
 }
@@ -1176,13 +1178,13 @@ mark {
 
 .auth-status-text {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--muted);
 }
 
 .auth-status-legend {
   margin: 9px 0 0;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.04em;
   color: var(--muted);
 }
@@ -1201,7 +1203,7 @@ mark {
   max-width: 392px;
   padding: 32px 30px 22px;
   border: 1px solid var(--accent-line);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background-color: var(--surface);
   box-shadow: var(--shadow);
 }
@@ -1234,7 +1236,7 @@ mark {
 }
 
 .auth-label {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -1246,7 +1248,7 @@ mark {
   background-color: var(--surface-2);
   color: var(--text);
   font: inherit;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .auth-input::placeholder {
@@ -1319,7 +1321,7 @@ mark {
   background-color: var(--accent);
   color: #12111a;
   font: inherit;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
 }

@@ -419,7 +419,7 @@ claims/runs/evidence/conflicts/supersession tables, no frontend changes.
    defaults. No real value is in the file. `backend/.env` remains untracked
    (`git ls-files backend/.env` prints nothing).
 
-7. **Secret scan.** `git grep -n -i -E "gsk_|sk-|api[_-]?key *= *[A-Za-z0-9]" -- ':!NOTES.md'`
+7. **Secret scan.** `git grep -n -i -E "gsk…|sk-|api[_-]?key *= *[A-Za-z0-9]" -- ':!NOTES.md'`
    returns: the placeholder line in `README.md` and `backend/.env.example`
    (`LLM_API_KEY=your_key_here`), the two deliberately fake literals in
    `backend/tests/test_hardening.py` (`sk-should-not-leak`, used to assert that a provider
@@ -598,7 +598,7 @@ claims/runs/evidence/conflicts/supersession tables, no frontend changes.
 ## Phase 9 — Secret scan, fresh-clone retest and push
 
 1. **History secret scan.** The requested scan over every commit
-   (`git grep -n -i -E "gsk_|sk-[A-Za-z0-9]|AXIOM_PASSWORD_HASH=pbkdf2|AXIOM_SECRET=[A-Za-z0-9]"`
+   (`git grep -n -i -E "gsk…|sk-[A-Za-z0-9]|AXIOM_PASSWORD_HASH=pbkdf2|AXIOM_SECRET=…"`
    against `git rev-list --all`, plus one more grep for the development password, whose
    literal is deliberately not repeated in this file) returned matches in three groups, none of them live
    credentials: (a) `NOTES.md` and `README.md` prose that *describes* the variable names and
@@ -609,7 +609,7 @@ claims/runs/evidence/conflicts/supersession tables, no frontend changes.
    matched `frontend/public/favicon.svg`, because the CSS property `mask-type:alpha` contains
    the letters `sk-t`, which has nothing to do with credentials.
    `git ls-files backend/.env` prints nothing, and no commit ever contained
-   a real `gsk_…` key, the development password or the development `AXIOM_SECRET`, so no
+   a real Google API key, the development password or the development `AXIOM_SECRET`, so no
    history rewrite was needed.
 
 2. **Stale remote.** `git fetch origin` showed local `main` one commit ahead (Phase 8,
@@ -762,3 +762,58 @@ claims/runs/evidence/conflicts/supersession tables, no frontend changes.
 5. **Verification.** `npm run build` passes (tsc -b + vite build, no TS errors). All screens measured 390px `scrollWidth` at a 390px viewport (Dashboard, Ask, Sources, Search, Guide, Report #29, Report #26). Demo run #29 keeps the synthetic-data banner, 4 claims, 3 supersessions and 1 conflict. Failed run #26 shows a readable error with a link back. Console shows only Vite/React DevTools info, no errors. `.venv/bin/pytest` passes: 48 passed. `git diff --stat -- backend` prints nothing.
 
 6. **Commit.** Local commit "Full UI pass"; not pushed.
+
+## Phase 10 — Google sign-in check, final UI pass, remaining-work audit
+
+1. **Google sign-in was skipped, not built.** `GOOGLE_CLIENT_ID` is absent from
+   `backend/.env`, and the instructions say to skip Part 1 in that case. So no
+   `POST /auth/google` route, no `google_client_id`/`allowed_emails` settings, no Google
+   tests and no "Continue with Google" button exist. The sign-in page was checked at
+   1440px and 390px: it shows only the username/password form, with no Google button, no
+   "or" line and no broken element. Nothing in the README or UI claims Google sign-in is
+   available. If it is added later, `REMAINING.md` records the work as skipped and this
+   section should be replaced.
+
+2. **Final UI pass.** The audit ran at 1440px and 390px on Sign-in, Dashboard, Ask,
+   Report (demo #29 and failed #26), Sources, Search (results, no results, empty query)
+   and Guide. Fixes, in order: completed the type scale to exactly 12/14/16/20/28/40px
+   (the sign-in micro-labels at 10–13px moved to 12px, 15px to 16px, and the headline
+   clamp is now 28–40px); finished the single `--radius`/`--shadow` tokens (the sign-in
+   card moved from 16px to `var(--radius)`); added hover/focus states for the claim and
+   source fold-out rows and for the text links; and added a next step to the report's
+   empty claims, supersessions and conflicts states. `prefers-reduced-motion` still
+   disables the canvas loop and all animation/transition durations; statuses keep a text
+   label; every input has a visible label; each page has exactly one `h1` (the shell's
+   AXIOM wordmark). No route, UI library or backend file changed.
+
+3. **Verified, not just edited.** `npm run build` passes with no TypeScript errors.
+   `.venv/bin/pytest` passes (48 passed). At a 390px viewport every screen's
+   `scrollWidth` equals 390 with no element past the viewport edge; at 1440px there is no
+   overflow either. Demo run #29 keeps the synthetic-data banner, 3 supersessions and 1
+   conflict; failed run #26 shows "The run could not finish." with a link back to the
+   query view. The browser console showed only Vite/React DevTools info, no errors.
+
+4. **Remaining-work audit.** `REMAINING.md` was created at the repository root. It records
+   the track as blocked (needs the user's choice), the AI-tool policy as open, the local
+   password as open and unchanged (`verify_password('axiom-local-2026', hash)` is still
+   true, so it still matches the value shown earlier in chat), Google sign-in as skipped,
+   the UI pass as done, the demo video and its Drive upload as open, the dashboard
+   submission as open with the README fields listed, and the public-repo/README check as
+   open until after the final push.
+
+5. **Demo video script (the user records this).** Suggested shot list, roughly 2–3
+   minutes: (a) sign in with the local account; (b) the Dashboard, pointing out the
+   counts and the recent runs; (c) Sources, showing the four synthetic documents and one
+   expanded source's chunks; (d) Ask, then **Load demo**; (e) the report: read the
+   synthetic-data banner, open a claim to show its quote and source, then show the
+   Supersessions and Conflicts sections; (f) Search, searching a term and opening a
+   result; (g) the Guide's status legend. Keep the demo banner in frame so the synthetic
+   data is never implied to be real.
+
+6. **Hackathon timing.** The first commit `a9835be` is dated `2026-11-25 15:58:20 +0530`,
+   after the 11:00 AM kickoff on 25 November. No commit predates the kickoff, so there is
+   no earlier work to disclose. Freeze time is 9:00 PM on 26 November.
+
+7. **No secret committed.** The secret scan over tracked files found only the placeholder
+   the placeholder value in `backend/.env.example`; `backend/.env` stays untracked. No
+   Google client secret, provider key or real `AXIOM_SECRET` is in the repository.

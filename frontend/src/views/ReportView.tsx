@@ -211,7 +211,8 @@ function ReportView() {
             {run.claims.length === 0 ? (
               <p className="empty">
                 No claims were extracted for this question.
-                <span className="muted"> “{run.question}”</span>
+                <span className="muted"> “{run.question}”</span> Try a broader question, and
+                check the Sources page that your documents were uploaded.
               </p>
             ) : (
               <ul className="claims">
@@ -225,7 +226,10 @@ function ReportView() {
           <section className="panel">
             <h3 className="panel-title">Supersessions ({run.supersessions.length})</h3>
             {run.supersessions.length === 0 ? (
-              <p className="empty">No claim supersedes another in this run.</p>
+              <p className="empty">
+                No claim supersedes another in this run. Read the claims above; nothing needs
+                resolving here.
+              </p>
             ) : (
               run.supersessions.map((supersession) => (
                 <div className="pair" key={`${supersession.old_claim_id}-${supersession.new_claim_id}`}>
@@ -246,7 +250,10 @@ function ReportView() {
           <section className="panel">
             <h3 className="panel-title">Conflicts ({run.conflicts.length})</h3>
             {run.conflicts.length === 0 ? (
-              <p className="empty">No conflicting claims in this run.</p>
+              <p className="empty">
+                No conflicting claims in this run. Read the claims above; nothing needs
+                resolving here.
+              </p>
             ) : (
               run.conflicts.map((conflict) => (
                 <div className="pair" key={`${conflict.claim_a_id}-${conflict.claim_b_id}`}>
