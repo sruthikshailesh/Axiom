@@ -26,13 +26,19 @@ interface Glyph {
 
 function seedNodes(width: number, height: number): DriftNode[] {
   const count = Math.min(44, Math.max(16, Math.round((width * height) / 30000)))
-  return Array.from({ length: count }, () => ({
-    x: Math.random() * width,
-    y: Math.random() * height,
-    vx: (Math.random() - 0.5) * 0.22,
-    vy: (Math.random() - 0.5) * 0.22,
-    radius: 1.1 + Math.random() * 1.5,
-  }))
+  return Array.from({ length: count }, () => {
+    // A fixed speed per node (0.18-0.24 px per frame) so every node visibly
+    // drifts instead of some sitting still at a near-zero velocity.
+    const angle = Math.random() * Math.PI * 2
+    const speed = 0.18 + Math.random() * 0.06
+    return {
+      x: Math.random() * width,
+      y: Math.random() * height,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      radius: 1.1 + Math.random() * 1.5,
+    }
+  })
 }
 
 function seedGlyphs(width: number, height: number): Glyph[] {
@@ -125,10 +131,11 @@ function NodeField({ still }: { still: boolean }) {
       for (const point of nodes) {
         point.x += point.vx
         point.y += point.vy
-        if (point.x < 0 || point.x > width) point.vx *= -1
-        if (point.y < 0 || point.y > height) point.vy *= -1
-        point.x = Math.min(width, Math.max(0, point.x))
-        point.y = Math.min(height, Math.max(0, point.y))
+        // Wrap at the edges so the drift never stalls against a boundary.
+        if (point.x < 0) point.x = width
+        if (point.x > width) point.x = 0
+        if (point.y < 0) point.y = height
+        if (point.y > height) point.y = 0
       }
       for (const glyph of glyphs) {
         glyph.y -= glyph.drift

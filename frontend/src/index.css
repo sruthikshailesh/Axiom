@@ -1116,7 +1116,7 @@ mark {
 
 .auth-flow-step-active .auth-flow-dot {
   background-color: var(--gold);
-  animation: auth-pulse 2.8s ease-in-out infinite;
+  animation: auth-pulse 2.4s ease-in-out infinite;
 }
 
 .auth-flow-step-active .auth-flow-label {
