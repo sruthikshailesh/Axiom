@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   errorMessage,
   listSources,
@@ -7,6 +7,7 @@ import {
   type SearchHit,
   type SourceSummary,
 } from '../api'
+import PageHeader from '../components/PageHeader'
 
 const DEBOUNCE_MS = 300
 const SNIPPET_LENGTH = 300
@@ -66,12 +67,19 @@ function Highlighted({ snippet }: { snippet: Snippet }) {
 }
 
 function SearchView() {
-  const [query, setQuery] = useState('')
+  // The top bar sends the term in the URL: /search?q=…
+  const [params] = useSearchParams()
+  const urlQuery = params.get('q')
+  const [query, setQuery] = useState(urlQuery ?? '')
   const [hits, setHits] = useState<SearchHit[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sources, setSources] = useState<Record<number, SourceSummary>>({})
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (urlQuery !== null) setQuery(urlQuery)
+  }, [urlQuery])
 
   useEffect(() => {
     let cancelled = false
@@ -143,13 +151,13 @@ function SearchView() {
 
   return (
     <div className="search">
-      <section className="panel">
-        <h2 className="panel-title">Search the corpus</h2>
-        <p className="muted">
-          Full-text search over every stored chunk. Click a passage to open it in its
-          source.
-        </p>
+      <PageHeader
+        eyebrow="Search"
+        title="Search"
+        description="Full-text search over every stored chunk. Click a passage to open it in its source."
+      />
 
+      <section className="card">
         <label className="field-label" htmlFor="search-query">
           Search passages
         </label>
@@ -174,7 +182,7 @@ function SearchView() {
       ) : null}
 
       {!term ? (
-        <section className="panel">
+        <section className="card">
           <p className="empty">
             Type a word or phrase to search. Results are ranked by PostgreSQL full-text
             search.
@@ -183,7 +191,7 @@ function SearchView() {
       ) : null}
 
       {term && !loading && hits !== null && hits.length === 0 ? (
-        <section className="panel">
+        <section className="card">
           <p className="empty">No passages match that search.</p>
           <p className="muted small">Try a different word or phrase.</p>
         </section>

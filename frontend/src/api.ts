@@ -98,12 +98,29 @@ export interface RecentRun {
   finished_at: string | null
 }
 
+export interface ClaimStatusCounts {
+  verified: number
+  conflict: number
+  uncertain: number
+  superseded: number
+}
+
+export interface LatestRun {
+  id: number
+  status: string
+  question: string
+  created_at: string
+}
+
 export interface DashboardSummary {
   sources: number
   runs: number
   runs_with_conflict: number
   latest_run_status: string | null
   recent_runs: RecentRun[]
+  claim_status_counts: ClaimStatusCounts
+  failed_run_count: number
+  latest_run: LatestRun | null
 }
 
 function detailMessage(detail: unknown): string | null {

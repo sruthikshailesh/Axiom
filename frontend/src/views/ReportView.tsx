@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { errorMessage, getRun, type Claim, type RunDetail } from '../api'
+import PageHeader from '../components/PageHeader'
 
 const ACTIVE_STATUSES = ['queued', 'researching', 'extracting', 'verifying']
 const STEPS = ['researching', 'extracting', 'verifying', 'done']
@@ -12,6 +13,12 @@ function currentStep(status: string): number {
 
 function StatusBadge({ status }: { status: Claim['status'] }) {
   return <span className={`badge badge-${status}`}>{status}</span>
+}
+
+function formatWhen(value: string | null): string {
+  if (!value) return 'No timestamp'
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString()
 }
 
 function ClaimItem({ claim }: { claim: Claim }) {
@@ -121,23 +128,29 @@ function ReportView() {
 
   if (loading) {
     return (
-      <section className="panel">
-        <p className="muted">Loading run…</p>
-      </section>
+      <div className="report">
+        <PageHeader eyebrow="Report" title="Loading run…" description="Fetching the report." />
+      </div>
     )
   }
 
   if (!run) {
     return (
-      <section className="panel">
-        <h2 className="panel-title">Run unavailable</h2>
-        <div className="alert alert-error" role="alert">
-          {error ?? 'Run not found.'}
-        </div>
-        <Link className="link" to="/">
-          Back to the query view
-        </Link>
-      </section>
+      <div className="report">
+        <PageHeader
+          eyebrow="Report"
+          title="Run unavailable"
+          description="This report could not be loaded."
+        />
+        <section className="card">
+          <div className="alert alert-error" role="alert">
+            {error ?? 'Run not found.'}
+          </div>
+          <Link className="link" to="/ask">
+            Back to the query view
+          </Link>
+        </section>
+      </div>
     )
   }
 
@@ -154,10 +167,20 @@ function ReportView() {
         </div>
       ) : null}
 
-      <section className="panel">
-        <h2 className="panel-title">{run.question}</h2>
-        <p className="muted small">Run #{run.id}</p>
+      <PageHeader
+        eyebrow="Report"
+        title={run.question}
+        meta={
+          <>
+            <span className={`run-status run-status-${run.status}`}>{run.status}</span>
+            <span className="muted small">
+              Run #{run.id} · {formatWhen(run.created_at)}
+            </span>
+          </>
+        }
+      />
 
+      <section className="card">
         {running ? (
           <p className="muted">
             {run.status === 'queued' ? 'Queued — waiting to start.' : `Working: ${run.status}.`}
@@ -197,7 +220,7 @@ function ReportView() {
           <div className="alert alert-error" role="alert">
             <strong>The run could not finish.</strong>
             <p>{run.error ?? 'No error message was recorded.'}</p>
-            <Link className="link" to="/">
+            <Link className="link" to="/ask">
               Back to the query view
             </Link>
           </div>
@@ -206,8 +229,8 @@ function ReportView() {
 
       {run.status === 'completed' ? (
         <>
-          <section className="panel">
-            <h3 className="panel-title">Claims ({run.claims.length})</h3>
+          <section className="card">
+            <h2 className="card-title">Claims ({run.claims.length})</h2>
             {run.claims.length === 0 ? (
               <p className="empty">
                 No claims were extracted for this question.
@@ -223,8 +246,8 @@ function ReportView() {
             )}
           </section>
 
-          <section className="panel">
-            <h3 className="panel-title">Supersessions ({run.supersessions.length})</h3>
+          <section className="card">
+            <h2 className="card-title">Supersessions ({run.supersessions.length})</h2>
             {run.supersessions.length === 0 ? (
               <p className="empty">
                 No claim supersedes another in this run. Read the claims above; nothing needs
@@ -247,8 +270,8 @@ function ReportView() {
             )}
           </section>
 
-          <section className="panel">
-            <h3 className="panel-title">Conflicts ({run.conflicts.length})</h3>
+          <section className="card">
+            <h2 className="card-title">Conflicts ({run.conflicts.length})</h2>
             {run.conflicts.length === 0 ? (
               <p className="empty">
                 No conflicting claims in this run. Read the claims above; nothing needs

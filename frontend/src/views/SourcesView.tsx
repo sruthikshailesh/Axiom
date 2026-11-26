@@ -8,6 +8,7 @@ import {
   type Chunk,
   type SourceSummary,
 } from '../api'
+import PageHeader from '../components/PageHeader'
 
 function formatDate(value: string): string {
   const parsed = new Date(value)
@@ -147,8 +148,14 @@ function SourcesView() {
 
   return (
     <div className="sources">
-      <section className="panel">
-        <h2 className="panel-title">Upload a source</h2>
+      <PageHeader
+        eyebrow="Sources"
+        title="Sources"
+        description="Upload documents and open any passage AXIOM indexed from them."
+      />
+
+      <section className="card">
+        <h2 className="card-title">Upload a source</h2>
         <form className="upload-form" onSubmit={onSubmit}>
           <label className="field">
             <span className="field-label">File (.txt, .md, .pdf)</span>
@@ -211,9 +218,9 @@ function SourcesView() {
         {notice ? <div className="alert alert-ok">{notice}</div> : null}
       </section>
 
-      <section className="panel">
-        <div className="panel-head">
-          <h2 className="panel-title">Source library</h2>
+      <section className="card">
+        <div className="card-head">
+          <h2 className="card-title">Source library</h2>
           <button className="button button-secondary" type="button" onClick={() => void loadSources()}>
             Refresh
           </button>

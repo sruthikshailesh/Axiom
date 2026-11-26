@@ -869,3 +869,53 @@ claims/runs/evidence/conflicts/supersession tables, no frontend changes.
    `alembic upgrade head` (`0004_demo_flag -> 0005_users`).
 
 6. **Commit.** Local commit "Add account creation"; not pushed.
+
+## Phase 12 — App shell redesign
+
+1. **What changed.** The shell is now a 260px dark sidebar plus a top bar: the AXIOM mark
+   and gold wordmark with "RESEARCH INTELLIGENCE" beneath, search and collapse icon
+   buttons, a dusty-purple "New question" button, a quick-actions card (upload, ask, load
+   demo), the six navigation rows with a purple left bar on the current page, a collapsible
+   Recents list of the last five runs, and a user footer whose initial/name/"Local account"
+   button opens a Sign out menu. The top bar carries the page title, a search field with a
+   ⌘K hint (⌘K / Ctrl+K focuses it; submitting opens `/search?q=…`) and the username
+   dropdown. Below 900px the sidebar becomes a slide-in panel opened from a menu button.
+   Ask moved from `/` to `/ask`, and `/` redirects there.
+
+2. **What the overview shows.** A command-center card (eyebrow, "Welcome back, {username}",
+   one line built from real counts, three actions), four stat cards, a "Needs your
+   attention" card, a "Claim statuses" card with a bar per status, and a ten-row recent-runs
+   table. Attention lists only real items: runs whose report contains a conflict (found by
+   reading the recent runs' details when the summary reports conflicts), failed runs with
+   their stored error line, and sources with zero chunks. Every empty state is one
+   sentence: "Nothing needs attention right now.", "No claims yet.", "No runs yet. Ask a
+   question, or load the demo to see a full report.", and "No runs yet." in Recents.
+
+3. **Backend.** One read-only change to `GET /dashboard/summary`: `claim_status_counts`
+   (one GROUP BY over `claim.status`, zero-padded to the four statuses),
+   `failed_run_count`, and `latest_run` (`id`, `status`, `question`, `created_at`).
+   Existing fields keep their names and meaning. One deviation, stated plainly: the recent
+   window grew from 5 to 10 rows (`RECENT_RUN_LIMIT`) so the dashboard's ten-row table has
+   ten rows; the existing test's `min(5, …)` assertion was updated to match. A new test
+   checks the four claim counts against the database's own GROUP BY, the failed count
+   against a `status = 'failed'` count, and that `latest_run` is the newest row.
+
+4. **Unchanged on purpose.** Sign-in (layout, copy, animation, logic), token handling, the
+   route guard, 401 handling, sign-out, `verifier.py`, `decide_status()`, the extractor
+   prompt, the demo seed and question, and the synthetic-data banner. Report content and
+   behaviour are the same; only its header (eyebrow "REPORT", question as the h1, status
+   badge, timestamp) and its section cards changed.
+
+5. **Verified in the browser** at 1440px and 390px: the four stat numbers matched
+   `/dashboard/summary` (sources 8, runs 32, runs with a conflict 15, claim statuses
+   10/26/17/14); every sidebar link resolved to its label's route and Report was a
+   disabled span with the tooltip "Run a question first" once the summary was empty; both
+   Load demo buttons reached a completed report with the synthetic-data banner, three
+   supersessions and one conflict; ⌘K focused the search and "ionosphere" returned six
+   passages; collapsing left the content's width and top unchanged; at 390px
+   `document.documentElement.scrollWidth` was 390 on every page with the runs table
+   scrolling inside its own container; the five forbidden strings were absent from every
+   page; and the console showed only Vite/React DevTools info. Body text measured 6.4–7.5:1
+   against its cards, and links moved to a lighter dusty purple to clear 4.5:1.
+
+6. **Commit.** Local commit "AXIOM app shell redesign"; not pushed.

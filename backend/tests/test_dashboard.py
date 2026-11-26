@@ -62,7 +62,7 @@ def test_summary_counts_match_the_database(client, db) -> None:
     assert summary["runs_with_conflict"] >= 1
     assert summary["latest_run_status"] == "completed"
 
-    assert len(summary["recent_runs"]) == min(5, expected_runs)
+    assert len(summary["recent_runs"]) == min(10, expected_runs)
     assert summary["recent_runs"][0]["id"] == newest.id
     assert summary["recent_runs"][-1]["question"] == "An older question"
 
@@ -78,6 +78,21 @@ def test_summary_returns_no_document_text(client) -> None:
         "runs_with_conflict",
         "latest_run_status",
         "recent_runs",
+        "claim_status_counts",
+        "failed_run_count",
+        "latest_run",
+    }
+    assert set(summary["claim_status_counts"]) == {
+        "verified",
+        "conflict",
+        "uncertain",
+        "superseded",
+    }
+    assert summary["latest_run"] is None or set(summary["latest_run"]) == {
+        "id",
+        "status",
+        "question",
+        "created_at",
     }
     for run in summary["recent_runs"]:
         assert set(run) == {
@@ -88,6 +103,58 @@ def test_summary_returns_no_document_text(client) -> None:
             "created_at",
             "finished_at",
         }
+
+
+def test_summary_claim_statuses_failures_and_latest_run_match_the_database(client, db) -> None:
+    finished = Run(question="What search technology is in use?", status="completed")
+    broken = Run(
+        question="A question whose run failed",
+        status="failed",
+        error="The run failed while processing its documents.",
+        created_at=datetime.now(timezone.utc) - timedelta(minutes=30),
+    )
+    db.add_all([finished, broken])
+    db.commit()
+    db.refresh(finished)
+
+    db.add_all(
+        [
+            _claim(finished.id, "PostgreSQL full-text search is in use.", "verified"),
+            _claim(finished.id, "Elasticsearch is still used.", "conflict"),
+            _claim(finished.id, "An index will be added later.", "uncertain"),
+            _claim(finished.id, "Elasticsearch ranked the documents.", "superseded"),
+        ]
+    )
+    db.commit()
+
+    response = client.get("/dashboard/summary")
+    assert response.status_code == 200, response.text
+    summary = response.json()
+
+    expected_counts = dict(
+        db.execute(select(Claim.status, func.count()).group_by(Claim.status)).all()
+    )
+    for status in ("verified", "conflict", "uncertain", "superseded"):
+        assert summary["claim_status_counts"][status] == expected_counts.get(status, 0)
+    assert summary["claim_status_counts"]["verified"] >= 1
+    assert summary["claim_status_counts"]["conflict"] >= 1
+    assert sum(summary["claim_status_counts"].values()) == db.scalar(
+        select(func.count()).select_from(Claim)
+    )
+
+    expected_failures = db.scalar(
+        select(func.count()).select_from(Run).where(Run.status == "failed")
+    )
+    assert summary["failed_run_count"] == expected_failures
+    assert summary["failed_run_count"] >= 1
+
+    newest = db.scalars(
+        select(Run).order_by(Run.created_at.desc(), Run.id.desc()).limit(1)
+    ).one()
+    assert summary["latest_run"]["id"] == newest.id
+    assert summary["latest_run"]["status"] == newest.status
+    assert summary["latest_run"]["question"] == newest.question
+    assert summary["latest_run"]["created_at"] is not None
 
 
 def test_summary_needs_a_token(anon_client) -> None:

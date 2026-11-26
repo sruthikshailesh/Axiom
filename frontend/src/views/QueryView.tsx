@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { errorMessage, startDemoRun, startRun } from '../api'
 import { rememberRun } from '../lastRun'
+import PageHeader from '../components/PageHeader'
 
 function QueryView() {
   const [question, setQuestion] = useState('')
@@ -45,13 +46,14 @@ function QueryView() {
   }
 
   return (
-    <section className="panel">
-      <h2 className="panel-title">Ask a question</h2>
-      <p className="muted">
-        AXIOM searches your sources, extracts claims, and verifies each one against its
-        evidence.
-      </p>
+    <div className="ask">
+      <PageHeader
+        eyebrow="Ask"
+        title="Ask a question"
+        description="AXIOM searches your sources, extracts claims, and checks each one against its evidence."
+      />
 
+      <section className="card">
       <form className="query-form" onSubmit={onSubmit}>
         <label className="field">
           <span className="field-label">Question</span>
@@ -96,7 +98,8 @@ function QueryView() {
           {demoError}
         </div>
       ) : null}
-    </section>
+      </section>
+    </div>
   )
 }
 
