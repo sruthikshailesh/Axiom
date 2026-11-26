@@ -150,8 +150,12 @@ function SearchView() {
           source.
         </p>
 
+        <label className="field-label" htmlFor="search-query">
+          Search passages
+        </label>
         <div className="search-box">
           <input
+            id="search-query"
             className="input"
             type="search"
             value={query}
@@ -181,6 +185,7 @@ function SearchView() {
       {term && !loading && hits !== null && hits.length === 0 ? (
         <section className="panel">
           <p className="empty">No passages match that search.</p>
+          <p className="muted small">Try a different word or phrase.</p>
         </section>
       ) : null}
 

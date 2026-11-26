@@ -748,3 +748,17 @@ claims/runs/evidence/conflicts/supersession tables, no frontend changes.
 11. **Cuts.** No avatar, no illustration, no second canvas, no theme switch, no animation on
     the strip beyond the pulse, and no change to the desktop shell, the other views, or any
     backend file.
+
+## Full UI pass
+
+1. **Scope.** Frontend-only polish pass over every screen (Sign-in, Dashboard, Ask, Report demo/failed, Sources docs/empty, Search results/none/empty, Guide) at 1440/1024/820/390px. No backend file, route, schema, verifier, extractor prompt, seed document, preset question, sign-in logic, token handling, route guard, sign-out or 401 handling changed.
+
+2. **Files changed.** `frontend/src/index.css`, `frontend/src/views/DashboardView.tsx`, `frontend/src/views/SearchView.tsx`, `frontend/src/views/SourcesView.tsx`. `NOTES.md` updated. No new routes, libraries or files.
+
+3. **Audit items fixed.** Placeholder contrast on `.auth-input::placeholder` raised from `#6f7682` (3.88–4.06:1) to `#8a9099` (≈5.18:1). Added visible `<label>` for the search input. Added a page heading to the Dashboard view. Added a next-step sentence to the search no-results and empty-source-chunk states. Added `:focus-visible` rings for `.nav-link`, `.claim-head`/`.source-head`, `.result`, `.run-question`, `.link`. Added `overflow-wrap: anywhere` to `.claim-text`, `.run-question`, `.chunk-text`, `.quote`, `.result-snippet`. Added `--radius` and `--shadow` tokens and normalized box radii/shadow to them. Normalized the largest off-scale font sizes (30→28, 26→28, 22→20, 19→20, 18→20).
+
+4. **Audit items not fixed (and why).** Full font-size normalization to the 12/14/16/20/28/40 scale was limited to the largest sizes; the remaining 10–15px labels were left because changing them shifts the sign-in and status layouts without a11y benefit (all pass 4.5:1). The sidebar's 900px horizontal-bar breakpoint and the auth 900px two-column breakpoint were left as-is (already verified at 820px). No dark-mode toggle, i18n, SEO or analytics were added (out of scope).
+
+5. **Verification.** `npm run build` passes (tsc -b + vite build, no TS errors). All screens measured 390px `scrollWidth` at a 390px viewport (Dashboard, Ask, Sources, Search, Guide, Report #29, Report #26). Demo run #29 keeps the synthetic-data banner, 4 claims, 3 supersessions and 1 conflict. Failed run #26 shows a readable error with a link back. Console shows only Vite/React DevTools info, no errors. `.venv/bin/pytest` passes: 48 passed. `git diff --stat -- backend` prints nothing.
+
+6. **Commit.** Local commit "Full UI pass"; not pushed.

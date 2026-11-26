@@ -61,6 +61,7 @@ function DashboardView() {
 
   return (
     <div className="dashboard">
+      <h2 className="panel-title">Dashboard</h2>
       <section className="quick-actions" aria-label="Quick actions">
         <Link className="button" to="/">
           Ask a question

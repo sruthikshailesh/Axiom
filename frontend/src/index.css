@@ -22,6 +22,10 @@
   --uncertain: #e0b24f;
   --superseded: #8b919c;
 
+  /* Shape + elevation tokens: one radius, one shadow for the whole app. */
+  --radius: 10px;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+
   --font-head: "Space Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     sans-serif;
   --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -120,7 +124,7 @@ code {
   display: block;
   width: 100%;
   padding: 9px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   border: 1px solid transparent;
   background: none;
   color: var(--muted);
@@ -134,6 +138,12 @@ code {
 .nav-link:hover {
   color: var(--text);
   background-color: #21252e;
+}
+
+.nav-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  color: var(--text);
 }
 
 .nav-link.active {
@@ -185,7 +195,7 @@ code {
 
 .app-title {
   margin: 0;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 600;
   letter-spacing: 0.34em;
   color: var(--gold);
@@ -225,7 +235,7 @@ code {
 .panel {
   background-color: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 22px 24px;
 }
 
@@ -238,7 +248,7 @@ code {
 
 .panel-title {
   margin: 0 0 8px;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
 }
 
@@ -258,7 +268,7 @@ h3.panel-title {
   margin: 8px 0 0;
   padding: 14px 16px;
   border: 1px dashed var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--text);
 }
 
@@ -266,6 +276,12 @@ h3.panel-title {
   display: inline-block;
   margin-top: 8px;
   font-size: 14px;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* Forms ------------------------------------------------------------------- */
@@ -292,7 +308,7 @@ h3.panel-title {
 .input {
   width: 100%;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   background-color: var(--bg);
   color: var(--text);
@@ -328,7 +344,7 @@ h3.panel-title {
 .button {
   display: inline-block;
   padding: 10px 18px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   border: 1px solid var(--accent);
   background-color: var(--accent);
   color: #12111a;
@@ -369,7 +385,7 @@ h3.panel-title {
 .alert {
   margin-top: 16px;
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   background-color: #14171d;
   font-size: 14px;
@@ -471,7 +487,7 @@ h3.panel-title {
 .claim {
   border: 1px solid var(--border);
   border-left: 3px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   padding: 12px 14px;
   background-color: var(--surface-2);
 }
@@ -507,6 +523,13 @@ h3.panel-title {
   cursor: pointer;
 }
 
+.claim-head:focus-visible,
+.source-head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
 .claim-toggle {
   color: var(--muted);
   width: 12px;
@@ -516,6 +539,7 @@ h3.panel-title {
 .claim-text {
   flex: 1;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .claim-meta {
@@ -604,10 +628,11 @@ h3.panel-title {
   margin: 0;
   padding: 12px 14px;
   border-left: 3px solid var(--accent);
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
   background-color: #10131a;
   color: var(--text);
   font-size: 14px;
+  overflow-wrap: anywhere;
 }
 
 .pair {
@@ -617,7 +642,7 @@ h3.panel-title {
   margin-top: 12px;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background-color: var(--surface-2);
 }
 
@@ -659,7 +684,7 @@ h3.panel-title {
 .stat {
   background-color: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 16px 18px;
 }
 
@@ -678,7 +703,7 @@ h3.panel-title {
 .stat-value {
   margin: 8px 0 0;
   font-family: var(--font-head);
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 600;
   color: var(--gold);
   font-variant-numeric: tabular-nums;
@@ -709,7 +734,7 @@ h3.panel-title {
   gap: 16px;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background-color: var(--surface-2);
 }
 
@@ -724,10 +749,17 @@ h3.panel-title {
   font-family: var(--font-head);
   color: var(--gold);
   text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
 .run-question:hover {
   text-decoration: underline;
+}
+
+.run-question:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .run-side {
@@ -799,7 +831,7 @@ h3.panel-title {
   text-align: left;
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background-color: var(--surface);
   color: inherit;
   font: inherit;
@@ -809,6 +841,11 @@ h3.panel-title {
 .result:hover {
   border-color: var(--accent-line);
   background-color: #1e222a;
+}
+
+.result:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .result-head {
@@ -828,6 +865,7 @@ h3.panel-title {
   font-size: 14px;
   color: var(--text);
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 mark {
@@ -881,7 +919,7 @@ mark {
 
 .source {
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   padding: 12px 14px;
   background-color: var(--surface-2);
 }
@@ -923,7 +961,7 @@ mark {
   gap: 12px;
   align-items: flex-start;
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   border: 1px solid transparent;
 }
 
@@ -944,6 +982,7 @@ mark {
   margin: 0;
   font-size: 14px;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* Sign-in ----------------------------------------------------------------- */
@@ -1006,7 +1045,7 @@ mark {
 
 .auth-wordmark {
   font-family: var(--font-head);
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 600;
   letter-spacing: 0.42em;
   color: var(--gold);
@@ -1164,14 +1203,12 @@ mark {
   border: 1px solid var(--accent-line);
   border-radius: 16px;
   background-color: var(--surface);
-  box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.5),
-    0 0 54px rgba(139, 122, 168, 0.14);
+  box-shadow: var(--shadow);
 }
 
 .auth-card-title {
   margin: 0;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 600;
   color: var(--text);
 }
@@ -1204,7 +1241,7 @@ mark {
 .auth-input {
   width: 100%;
   padding: 11px 13px;
-  border-radius: 9px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   background-color: var(--surface-2);
   color: var(--text);
@@ -1213,7 +1250,7 @@ mark {
 }
 
 .auth-input::placeholder {
-  color: #6f7682;
+  color: #8a9099;
 }
 
 .auth-input:hover:not(:disabled) {
@@ -1251,7 +1288,7 @@ mark {
   height: 32px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: none;
   color: var(--muted);
   cursor: pointer;
@@ -1278,7 +1315,7 @@ mark {
   margin-top: 4px;
   padding: 11px 16px;
   border: 1px solid var(--accent);
-  border-radius: 9px;
+  border-radius: var(--radius);
   background-color: var(--accent);
   color: #12111a;
   font: inherit;
@@ -1305,7 +1342,7 @@ mark {
   margin: 16px 0 0;
   padding: 10px 12px;
   border: 1px solid var(--conflict);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background-color: rgba(224, 102, 102, 0.08);
   color: #ffd9d9;
   font-size: 14px;

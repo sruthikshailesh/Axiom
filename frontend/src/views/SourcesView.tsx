@@ -271,7 +271,9 @@ function SourcesView() {
                           {chunkErrors[source.id]}
                         </div>
                       ) : chunks && chunks.length === 0 ? (
-                        <p className="empty">This source has no chunks.</p>
+                        <p className="empty">
+                          This source has no chunks. Upload a different file.
+                        </p>
                       ) : (
                         chunks?.map((chunk) => (
                           <div className="chunk" id={`chunk-${chunk.id}`} key={chunk.id}>
